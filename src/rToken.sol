@@ -41,7 +41,7 @@ contract Token is ERC20, AccessControl {
     uint8 private immutable _decimals;
 
     /// @notice Admin address
-    address private immutable _admin;
+    address public immutable admin;
 
     /**
      * @notice Construct new token
@@ -58,7 +58,7 @@ contract Token is ERC20, AccessControl {
     ) ERC20(tokenName, tokenSymbol) {
         // Set decimals
         _decimals = tokenDecimals;
-        _admin = adminAddress;
+        admin = adminAddress;
 
         // Grant the admin role to a specified account
         // https://docs.openzeppelin.com/contracts/4.x/access-control#granting-and-revoking
@@ -68,11 +68,6 @@ contract Token is ERC20, AccessControl {
     /// @dev https://docs.openzeppelin.com/contracts/4.x/erc20#a-note-on-decimals
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
-    }
-
-    /// @notice Returns of the admin address that can mint/burn token
-    function admin() external view returns (address) {
-        return _admin;
     }
 
     /**
