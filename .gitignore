@@ -1,1 +1,4 @@
 /out
+
+# Ignore hevm files
+hevm.libs*
