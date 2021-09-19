@@ -4,8 +4,8 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
-import {HEVM} from "./IHEVM.sol";
-import {Token} from "./rToken.sol";
+import {HEVM} from "./utils/IHEVM.sol";
+import {Token} from "../rToken.sol";
 
 // TODO(bayu):
 // - Prove that we can assign new admin role
