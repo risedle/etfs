@@ -2,3 +2,6 @@
 
 # Ignore hevm files
 hevm.libs*
+
+# Ignore secret files
+.env
