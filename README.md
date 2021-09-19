@@ -1,5 +1,7 @@
 # Risedle ETFs
 
+![This is us anon!](./meme.png)
+
 This repository contains smart contract for decentralized leveraged ETFs.
 
 - Website: [risedle.com](https://risedle.com)
