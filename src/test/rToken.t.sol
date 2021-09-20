@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
-import {HEVM} from "./utils/IHEVM.sol";
+import {HEVM} from "./utils/HEVM.sol";
 import {rToken} from "../rToken.sol";
 
 // TODO(bayu):
@@ -14,7 +14,7 @@ contract rTokenTest is DSTest {
 
     /// @notice Initialize hevm, so we can use the cheat codes
     function setUp() public {
-        hevm = HEVM(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
+        hevm = new HEVM();
     }
 
     /// @notice Make sure all token properties is setup correctly
