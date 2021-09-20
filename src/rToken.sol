@@ -35,7 +35,7 @@ import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessC
 /**
  * @title rToken is a simple mintable & burnable token with access control
  */
-contract Token is ERC20, AccessControl {
+contract rToken is ERC20, AccessControl {
     /// @notice Decimals of the token
     /// @dev https://docs.openzeppelin.com/contracts/4.x/erc20#a-note-on-decimals
     uint8 private immutable _decimals;

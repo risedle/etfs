@@ -33,7 +33,7 @@ I wrote this for ETHOnline Hackathon 2021. Enjoy.
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import {Token} from "./rToken.sol";
+import {rToken} from "./rToken.sol";
 
 /**
  * @title ETHRISE
@@ -43,8 +43,8 @@ contract ETHRISE is ERC20 {
     /// @notice USDC token contract
     IERC20 public immutable USDC;
 
-    /// @notice rToken represents balance of the lender supplied to the market
-    Token public immutable rToken;
+    /// @notice rETHRISE represents balance of the lender supplied to the market
+    rToken public immutable rETHRISE;
 
     /// @notice Track how much supply is borrowed
     uint256 public totalSupplyBorrowed;
@@ -62,8 +62,8 @@ contract ETHRISE is ERC20 {
         // USDC Contract
         USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
 
-        // Create new rToken
-        rToken = new Token(
+        // Create new rETHRISE
+        rETHRISE = new rToken(
             "Risedle ETHRISE Supply Shares",
             "rETHRISE",
             6, // Same as USDC decimals

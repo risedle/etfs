@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "lib/ds-test/src/test.sol";
 
 import {ETHRISE} from "../ETHRISE.sol";
-import {Token} from "../rToken.sol";
+import {rToken} from "../rToken.sol";
 
 contract ETHRISE_Properties is DSTest {
     /// @notice Make sure all token properties is setup correctly
@@ -19,7 +19,7 @@ contract ETHRISE_Properties is DSTest {
         assertEq(ethrise.decimals(), 18); // It should set to default value
 
         // Makure sure rETHRISE properties are set
-        Token rETHRISE = Token(address(ethrise.rToken()));
+        rToken rETHRISE = rToken(address(ethrise.rETHRISE()));
         assertEq(rETHRISE.name(), "Risedle ETHRISE Supply Shares");
         assertEq(rETHRISE.symbol(), "rETHRISE");
         assertEq(rETHRISE.decimals(), 6); // Should be similar to the USDC

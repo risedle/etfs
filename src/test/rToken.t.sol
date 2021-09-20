@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "lib/ds-test/src/test.sol";
 
 import {HEVM} from "./utils/IHEVM.sol";
-import {Token} from "../rToken.sol";
+import {rToken} from "../rToken.sol";
 
 // TODO(bayu):
 // - Prove that we can assign new admin role
@@ -26,7 +26,7 @@ contract rTokenTest is DSTest {
         address tokenAdminAddress = address(this); // set current contract as admin
 
         // Initialize new token
-        Token token = new Token(
+        rToken token = new rToken(
             tokenName,
             tokenSymbol,
             tokenDecimals,
@@ -44,7 +44,7 @@ contract rTokenTest is DSTest {
     function test_rToken_AdminCanMintToken() public {
         // Initialize new token
         address adminAddress = address(this); // Set this contract as admin
-        Token token = new Token(
+        rToken token = new rToken(
             "Risedle ETHRISE Supply",
             "rETHRISE",
             8,
@@ -68,7 +68,7 @@ contract rTokenTest is DSTest {
     /// @notice Test that only adminAddress can mint the token
     function testFail_rToken_NonAdminCannotMintToken() public {
         address adminAddress = hevm.addr(1); // Set admin to other user
-        Token token = new Token(
+        rToken token = new rToken(
             "Risedle ETHRISE Supply",
             "rETHRISE",
             8,
@@ -87,7 +87,7 @@ contract rTokenTest is DSTest {
     function test_rToken_AdminCanBurnToken() public {
         // Initialize new token
         address adminAddress = address(this); // Set this contract as admin
-        Token token = new Token(
+        rToken token = new rToken(
             "Risedle ETHRISE Supply",
             "rETHRISE",
             8,
@@ -113,7 +113,7 @@ contract rTokenTest is DSTest {
     function testFail_rToken_NonAdminCannotBurnToken() public {
         address adminAddress = hevm.addr(1);
         // Initialize new token
-        Token token = new Token(
+        rToken token = new rToken(
             "Risedle ETHRISE Supply",
             "rETHRISE",
             8,
