@@ -47,7 +47,7 @@ contract ETHRISE is ERC20 {
     rToken public immutable rETHRISE;
 
     /// @notice Track how much supply is borrowed
-    uint256 public totalSupplyBorrowed;
+    uint256 public totalUSDCBorrowed;
 
     /// @notice Event emitted when lender add supply to the market
     event SupplyAdded(address indexed by, uint256 amount);
@@ -69,5 +69,40 @@ contract ETHRISE is ERC20 {
             6, // Same as USDC decimals
             address(this) // Only this contract can mint & burn the token
         );
+
+        // Set USDCBorrowed to zero
+        totalUSDCBorrowed = 0;
+    }
+
+    /**
+     * @notice getrETHRISEValueInUSDC retuns the value of rETHRISE in USDC
+     * @dev Underlying math can be accesed here: https://hackmd.io/@bayualsyah/Sk3SOoVQF
+     */
+    function getrETHRISEValueInUSDC() internal view returns (uint256) {
+        uint256 rETHRISETotalSupply = rETHRISE.totalSupply();
+        // If total supply is 0, then return 1:1 USDC
+        uint256 valueInUSDC = 1;
+        // Otherwise calculate the value per rETHRISE
+        if (rETHRISETotalSupply != 0) {
+            uint256 totalUSDCManaged = USDC.balanceOf(address(this)) +
+                totalUSDCBorrowed;
+            valueInUSDC = totalUSDCManaged / rETHRISETotalSupply;
+        }
+        return valueInUSDC;
+    }
+
+    /**
+     * @notice depositUSDC deposits USDC to the lending pool.
+     * Lender will receive rToken represents their share to the pool
+     */
+    function depositUSDC(uint256 usdcAmount) external {
+        // Transfer USDC to the contract
+        USDC.transferFrom(msg.sender, address(this), usdcAmount);
+
+        // Calculate rETHRISE minted amount
+        uint256 mintedAmount = usdcAmount / getrETHRISEValueInUSDC();
+
+        // Mint rETHRISE to the lender
+        rETHRISE.mint(msg.sender, mintedAmount);
     }
 }
