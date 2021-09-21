@@ -31,4 +31,15 @@ contract RisedleSupplyTest is DSTest {
         assertEq(rs.underlying(), usdtAddress);
         assertEq(rs.borrower(), borrowerAddress);
     }
+
+    /// @notice Make sure it fails when the underlying asset is non ERC20
+    function testFail_RisedleSupplyUnderlyingNonERC20() public {
+        // Set the properties
+        string memory name = "ETHRISE USDT Supply";
+        string memory symbol = "rsETHRISE";
+        address borrowerAddress = address(this); // Set this contract as borrower
+
+        // Make sure it's fail when the underlying is set to non ERC20
+        new RisedleSupply(name, symbol, borrowerAddress, borrowerAddress);
+    }
 }
