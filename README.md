@@ -7,7 +7,7 @@ This repository contains smart contract for decentralized leveraged ETFs.
 - Website: [risedle.com](https://risedle.com)
 - Docs: [docs.risedle.com](https://docs.risedle.com)
 - Twitter: [@risedle](https://twitter.com/risedle)
-- Whitepaper: [ETHRISE Whitepaper](https://hackmd.io/@bayualsyah/ethrise)
+- Whitepaper: [ETHRISE Whitepaper](https://observablehq.com/@pyk/ethrise)
 
 ## Installation
 
