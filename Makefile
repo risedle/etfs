@@ -8,8 +8,11 @@ all:
 clean:
 	dapp clean
 
-test :
-	dapp test --rpc -v
+test:
+	dapp test --rpc -v -m test
 
 test-only:
 	dapp test --rpc -v -m $(filter)
+
+prove:
+	dapp test -v -m prove
