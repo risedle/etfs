@@ -21,6 +21,7 @@ contract HEVM {
     /// @notice Store the HEVM contract here
     IHEVM private immutable _hevm;
     IERC20 USDC;
+    IERC20 USDT;
 
     constructor() {
         // Assign hevm contract
@@ -29,6 +30,7 @@ contract HEVM {
 
         // Assign USDC contract in mainnet
         USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+        USDT = IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     }
 
     /// @notice Returns dummy address given secret key
@@ -45,6 +47,20 @@ contract HEVM {
         // We get the 9 number using bruteforce method
         _hevm.store(
             address(USDC),
+            keccak256(abi.encode(recipientAddress, uint256(9))),
+            bytes32(amount + recipientBalance)
+        );
+    }
+
+    /// @notice Send USDT to specified address
+    function sendUSDT(address recipientAddress, uint256 amount) external {
+        // Get existing balance
+        uint256 recipientBalance = USDT.balanceOf(recipientAddress);
+
+        // Top up amount
+        // We get the 9 number using bruteforce method
+        _hevm.store(
+            address(USDT),
             keccak256(abi.encode(recipientAddress, uint256(9))),
             bytes32(amount + recipientBalance)
         );
