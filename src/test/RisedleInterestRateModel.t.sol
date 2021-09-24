@@ -45,4 +45,36 @@ contract RisedleInterestRateModelTest is DSTest, RisedleInterestRateModel {
         );
         assertEq(utilizationRateAsWad3, expectedUtilizationRateAsWad3);
     }
+
+    /// @notice Make sure the borrow rate calculation is correct
+    function test_BorrowRateCalculation() public {
+        // Set the model parameters
+        OPTIMAL_UTILIZATION_RATE_WAD = 900000000000000000; // 90% utilization
+        INTEREST_SLOPE_1_WAD = 200000000000000000; // 20% slope 1
+        INTEREST_SLOPE_2_WAD = 600000000000000000; // 60% slope 2
+
+        // Set utilization rate
+        uint256 utilizationRateWad1 = 500000000000000000; // 0.5 or 50%
+        uint256 expectedBorrowRatePerSecondWad1 = 3523310220; // approx 11.75% APY
+
+        // Calculate borrow rate per second
+        uint256 borrowRatePerSecondWad1 = calculateBorrowRatePerSecondWad(
+            utilizationRateWad1
+        );
+
+        // Make sure the calculation is correct
+        assertEq(borrowRatePerSecondWad1, expectedBorrowRatePerSecondWad1);
+
+        // Set utilization rate
+        uint256 utilizationRateWad2 = 940000000000000000; // 0.94 or 94%
+        uint256 expectedBorrowRatePerSecondWad2 = 19025875190; // approx 82.122% APY
+
+        // Calculate borrow rate per second
+        uint256 borrowRatePerSecondWad2 = calculateBorrowRatePerSecondWad(
+            utilizationRateWad2
+        );
+
+        // Make sure the calculation is correct
+        assertEq(borrowRatePerSecondWad2, expectedBorrowRatePerSecondWad2);
+    }
 }
