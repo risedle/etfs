@@ -17,6 +17,22 @@ import {DSMath} from "lib/ds-math/src/math.sol";
 
 /// @title Risedle's Lending Pool Contract
 contract RisedleInterestRateModel is DSMath {
+    /// @notice Optimal utilization rate stored in wad
+    ///         For example, 90% or 0.9 is equal to 900000000000000000
+    uint256 public OPTIMAL_UTILIZATION_RATE_WAD;
+
+    /// @notice Interest slope 1, stored in wad
+    uint256 public INTEREST_SLOPE_1_WAD;
+
+    /// @notice Interest slop 2, stored in wad
+    uint256 public INTEREST_SLOPE_2_WAD;
+
+    /// @notice Number of seconds in a year, stored in wad
+    uint256 public immutable SECONDS_PER_YEAR_WAD = 31536000000000000000000000;
+
+    /// @notice 1 stored as wad
+    uint256 public immutable ONE_WAD = 1000000000000000000;
+
     /**
      * @notice calculateUtilizationRateWad calculates the utilization rate of
      *         the lending pool.
@@ -41,5 +57,37 @@ contract RisedleInterestRateModel is DSMath {
 
         // Ut = Bt/(Ct + Bt - Rt)
         return wdiv(borrowed, sub(add(cash, borrowed), reserved));
+    }
+
+    /**
+     * @notice calculateBorrowRatePerSecondWad calculates the borrow rate per second.
+     * @param utilizationRateWad The current utilization rate, stored as wad
+     * @return The borrow rate as a wad
+     */
+    function calculateBorrowRatePerSecondWad(uint256 utilizationRateWad)
+        internal
+        view
+        returns (uint256)
+    {
+        // Calculate the borrow rate
+        if (utilizationRateWad <= OPTIMAL_UTILIZATION_RATE_WAD) {
+            uint256 borrowRatePerYearWad = wmul(
+                wdiv(utilizationRateWad, OPTIMAL_UTILIZATION_RATE_WAD),
+                INTEREST_SLOPE_1_WAD
+            );
+            return wdiv(borrowRatePerYearWad, SECONDS_PER_YEAR_WAD);
+        } else {
+            uint256 borrowRatePerYearWad = add(
+                INTEREST_SLOPE_1_WAD,
+                wmul(
+                    wdiv(
+                        sub(utilizationRateWad, OPTIMAL_UTILIZATION_RATE_WAD),
+                        sub(ONE_WAD, utilizationRateWad)
+                    ),
+                    INTEREST_SLOPE_2_WAD
+                )
+            );
+            return wdiv(borrowRatePerYearWad, SECONDS_PER_YEAR_WAD);
+        }
     }
 }
