@@ -135,37 +135,58 @@ contract RisedleVaultInternalTest is
     }
 
     /// @notice Make sure the borrow rate calculation is correct
-    function test_GetBorrowRate() public {
+    function test_GetBorrowRatePerSecond() public {
         // Set the model parameters
         OPTIMAL_UTILIZATION_RATE_WAD = 900000000000000000; // 90% utilization
         INTEREST_SLOPE_1_WAD = 200000000000000000; // 20% slope 1
         INTEREST_SLOPE_2_WAD = 600000000000000000; // 60% slope 2
 
-        // Set utilization rate
-        uint256 utilizationRateWad1 = 500000000000000000; // 0.5 or 50%
-        uint256 expectedBorrowRatePerSecondWad1 = 3523310220; // approx 11.75% APY
+        bool invalid;
+        uint256 borrowRatePerSecondWad;
 
-        // Calculate borrow rate per second
-        uint256 borrowRatePerSecondWad1 = getBorrowRatePerSecondWad(
-            utilizationRateWad1
-        );
-        assertEq(borrowRatePerSecondWad1, expectedBorrowRatePerSecondWad1);
+        // Initial state: 0 utilization
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(0); // 0%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, 0);
 
-        // Set utilization rate
-        uint256 utilizationRateWad2 = 940000000000000000; // 0.94 or 94%
-        uint256 expectedBorrowRatePerSecondWad2 = 19025875190; // approx 82.122% APY
+        // 0.5 utilization rate (50%)
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            500000000000000000
+        ); // 50%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, 3523310220); // approx 11.75% APY
 
-        // Calculate borrow rate per second
-        uint256 borrowRatePerSecondWad2 = getBorrowRatePerSecondWad(
-            utilizationRateWad2
-        );
-        assertEq(borrowRatePerSecondWad2, expectedBorrowRatePerSecondWad2);
+        // 0.94 utilization rate (94%)
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            940000000000000000
+        ); // 50%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, 19025875190); // approx 82.122% APY
 
-        // Make sure capped borrow rate works
-        uint256 utilizationRateWad3 = 970000000000000000; // 97%
-        uint256 borrowRatePerSecondWad3 = getBorrowRatePerSecondWad(
-            utilizationRateWad3
-        );
-        assertEq(borrowRatePerSecondWad3, MAX_BORROW_RATE_PER_SECOND_WAD);
+        // 0.97 utilization rate (97%)
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            970000000000000000
+        ); // 97%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+
+        // 0.99 utilization rate (99%)
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            990000000000000000
+        ); // 99%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+
+        // 1.0 utilization rate (100%)
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(ONE_WAD); // 100%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+
+        // More than 100% utilization rate should be capped to max borrow rate
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            1086956521739130000
+        ); // 108%
+        assertFalse(invalid);
+        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
     }
 }
