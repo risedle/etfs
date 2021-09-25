@@ -5,3 +5,6 @@
 	path = lib/ds-test
 	url = https://github.com/risedle/ds-test
 	branch = master
+[submodule "lib/meth"]
+	path = lib/meth
+	url = https://github.com/risedle/meth
