@@ -40,8 +40,8 @@ contract RisedleVaultInternalTest is
         // Make sure total borrowed is zero
         assertEq(totalBorrowed, 0);
 
-        // Make sure total reserved is zero
-        assertEq(totalReserved, 0);
+        // Make sure total collected fees is zero
+        assertEq(totalCollectedFees, 0);
 
         // Make sure optimal utilization rate is set to 90%
         assertEq(OPTIMAL_UTILIZATION_RATE_WAD, 900000000000000000);
@@ -73,71 +73,67 @@ contract RisedleVaultInternalTest is
         bool invalid;
         uint256 utilizationRateWad;
 
-        // Initial state: zero available, zero borrowed and zero reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 0, 0);
+        // Initial state: zero available, zero borrowed and zero collected fees
+        hevm.setUSDTBalance(address(this), 0); // Set total available cash to 0
+        totalBorrowed = 0;
+        totalCollectedFees = 0;
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, 0);
 
-        // x available, zero borrowed, zero reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            100 * 1e6, // 100USDT
-            0,
-            0
-        );
+        // x available, zero borrowed, zero collected fees
+        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
+        totalBorrowed = 0;
+        totalCollectedFees = 0;
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, 0);
 
-        // x available, y borrowed, zero reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            100 * 1e6, // 100USDT
-            50 * 1e6, // 50 USDT
-            0
-        );
+        // x available, y borrowed, zero collected fees
+        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
+        totalBorrowed = 50 * 1e6; // 50 USDT
+        totalCollectedFees = 0;
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, 333333333333333333); // 0.33 Utilization rate
 
-        // x available, y borrowed, z reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            100 * 1e6, // 100USDT
-            50 * 1e6, // 50 USDT
-            10 * 1e6 // 10 USDT reserved
-        );
+        // x available, y borrowed, z collected fees
+        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
+        totalBorrowed = 50 * 1e6; // 50 USDT
+        totalCollectedFees = 10 * 1e6; // 10 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, 357142857142857143); // 0.35 Utilization rate
 
-        // x available < y borrowed, zero reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            50 * 1e6, // 50USDT
-            100 * 1e6, // 50 USDT
-            0
-        );
+        // x available < y borrowed, zero collected fees
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set total available cash to 50 USDT
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 0;
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, 666666666666666667); // 0.71 Utilization rate
 
         // More than 100% utilization rate
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            0,
-            100 * 1e6, // 100 USDT
-            10 * 1e6 // 10 USDT
-        );
+        hevm.setUSDTBalance(address(this), 0); // Set total available cash to 0 USDT
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 10 * 1e6; // 10 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertFalse(invalid);
         assertEq(utilizationRateWad, ONE_WAD);
 
-        // Reserved amount should not be too large
+        // Total collected fees should not be too large
         // x available < y borrowed < z reserved
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            50 * 1e6, // 50USDT
-            100 * 1e6, // 50 USDT
-            200 * 1e6 // 200 USDT
-        );
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set total available cash to 50 USDT
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 200 * 1e6; // 200 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertTrue(invalid);
 
         // Test overflow
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            ((2**256) - 1),
-            ((2**256) - 1),
-            0
-        );
+        hevm.setUSDTBalance(address(this), ((2**256) - 1));
+        totalBorrowed = ((2**256) - 1); // 100 USDT
+        totalCollectedFees = 0; // 200 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad();
         assertTrue(invalid);
     }
 
