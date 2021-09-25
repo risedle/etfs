@@ -22,6 +22,13 @@ contract RisedleVaultInternalTest is
     DSTest,
     RisedleVault(vaultTokenName, vaultTokenSymbol, usdtAddress, rvUSDTAdmin)
 {
+    /// @notice hevm utils to alter mainnet state
+    HEVM hevm;
+
+    function setUp() public {
+        hevm = new HEVM();
+    }
+
     /// @notice Make sure all important variables are correctly set after deployment
     function test_VaultProperties() public {
         // Make sure underlying asset is correct
@@ -188,5 +195,14 @@ contract RisedleVaultInternalTest is
         ); // 108%
         assertFalse(invalid);
         assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+    }
+
+    /// @notice Make sure getAvailableCash return correctly
+    function test_GetAvailableCash() public {
+        // Set USDT balance of this contract
+        uint256 amount = 1000 * 1e6;
+        hevm.setUSDTBalance(address(this), amount);
+        uint256 currentCash = getAvailableCash();
+        assertEq(currentCash, amount);
     }
 }
