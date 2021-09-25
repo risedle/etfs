@@ -14,6 +14,8 @@ interface IHEVM {
         bytes32 loc,
         bytes32 val
     ) external;
+
+    function warp(uint256 x) external;
 }
 
 /// @notice We use this contract to interact with HEVM
@@ -74,5 +76,10 @@ contract HEVM {
             keccak256(abi.encode(account, uint256(2))),
             bytes32(amount)
         );
+    }
+
+    /// @notice Set block.timestamp to x
+    function warp(uint256 x) public {
+        _hevm.warp(x);
     }
 }
