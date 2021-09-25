@@ -261,4 +261,62 @@ contract RisedleVaultInternalTest is
         assertEq(totalBorrowed, 109000000); // 109 USDT
         assertEq(totalCollectedFees, 6000000); // 6 USDT
     }
+
+    /// @notice Make sure accrue interest is working perfectly
+    function test_AccrueInterest() public {
+        bool invalid;
+
+        // Scenario 1: 0% utilization
+        totalBorrowed = 0;
+        totalCollectedFees = 0;
+        uint256 contractBalance = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(this), contractBalance); // Set the contract balance
+        invalid = accrueInterest();
+        assertFalse(invalid);
+        // Make sure it doesn't change the totalBorrowed and totalCollectedFees
+        assertEq(totalBorrowed, 0);
+        assertEq(totalCollectedFees, 0);
+
+        // Scenario 2: Below optimal utilization rate
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 20 * 1e6; // 20 USDT
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
+        lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        // Set block timestamp to 24 hours later
+        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 24));
+        // Perform interest calculation
+        invalid = accrueInterest();
+        assertFalse(invalid);
+        // Make sure the totalBorrowed and totalCollectedFees are updated
+        assertEq(totalBorrowed, 100042149); // 100 + (90% of interest amount)
+        assertEq(totalCollectedFees, 20004683); // 20 + (10% of interest amount)
+
+        // Scenario 3: Above optimzal utilization rate
+        totalBorrowed = 400 * 1e6; // 400 USDT
+        totalCollectedFees = 20 * 1e6; // 20 USDT
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
+        lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        // Set block timestamp to 3 hours later
+        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 3));
+        // Perform interest calculation
+        invalid = accrueInterest();
+        assertFalse(invalid);
+        // Make sure the totalBorrowed and totalCollectedFees are updated
+        assertEq(totalBorrowed, 400056712); // 400 + (90% of interest amount)
+        assertEq(totalCollectedFees, 20006301); // 20 + (10% of interest amount)
+
+        // Scenario 4: Maximum utilization rate
+        totalBorrowed = 15000 * 1e6; // 15000 USDT
+        totalCollectedFees = 20 * 1e6; // 20 USDT
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
+        lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        // Set block timestamp to 10 hours later
+        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 10));
+        // Perform interest calculation
+        invalid = accrueInterest();
+        assertFalse(invalid);
+        // Make sure the totalBorrowed and totalCollectedFees are updated
+        assertEq(totalBorrowed, 15024657534); // 400 + (90% of interest amount)
+        assertEq(totalCollectedFees, 22739726); // 20 + (10% of interest amount)
+    }
 }
