@@ -44,7 +44,7 @@ contract HEVM {
         uint256 recipientBalance = USDC.balanceOf(recipientAddress);
 
         // Top up amount
-        // We get the 9 number using bruteforce method
+        // We get the 9 number using slot20 npm package
         _hevm.store(
             address(USDC),
             keccak256(abi.encode(recipientAddress, uint256(9))),
@@ -58,11 +58,21 @@ contract HEVM {
         uint256 recipientBalance = USDT.balanceOf(recipientAddress);
 
         // Top up amount
-        // We get the 9 number using bruteforce method
+        // We get the 2 number using slot20 npm package
         _hevm.store(
             address(USDT),
-            keccak256(abi.encode(recipientAddress, uint256(9))),
+            keccak256(abi.encode(recipientAddress, uint256(2))),
             bytes32(amount + recipientBalance)
+        );
+    }
+
+    /// @notice Set USDT balance of specified address
+    function setUSDTBalance(address account, uint256 amount) external {
+        // We get the 2 number using slot20 npm package
+        _hevm.store(
+            address(USDT),
+            keccak256(abi.encode(account, uint256(2))),
+            bytes32(amount)
         );
     }
 }
