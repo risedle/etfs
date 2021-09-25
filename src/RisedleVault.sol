@@ -59,6 +59,9 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /// @notice Maximum borrow rate per second
     uint256 public immutable MAX_BORROW_RATE_PER_SECOND_WAD = 50735667174; // Approx 393% APY
 
+    /// @notice Performance fee for the lender
+    uint256 public PERFORMANCE_FEE_WAD = 100000000000000000; // 10% performance fee
+
     /// @notice Timestammp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
 
@@ -135,48 +138,47 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     }
 
     /**
-     * @notice getAvailableCash returns the total amount of underlying asset
+     * @notice getTotalAvailable returns the total amount of underlying asset
      *         that available to borrow
-     * @return The quantity of underlying assets owned by this contract
+     * @return The amount of underlying asset ready to borrow
      */
-    function getAvailableCash() internal view returns (uint256) {
+    function getTotalAvailable() internal view returns (uint256) {
         IERC20 underlyingToken = IERC20(underlying);
-        return underlyingToken.balanceOf(address(this));
+        uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
+        if (totalCollectedFees >= underlyingBalance) return 0;
+        return underlyingBalance - totalCollectedFees;
     }
 
     /**
      * @notice getUtilizationRateWad calculates the utilization rate of
      *         the vault. If there is an overflow or underflow, simply
-     *         return the value with invalid=true.
+     *         return 0 with invalid=true.
+     * @param available The amount of cash available to borrow in the vault
+     * @param borrowed The amount of borrowed asset in the vault
      * @return invalid True if overflow/underflow and reserved amount too large
      * @return rateWad The utilization rate as wad, valid if invalid=false
      */
-    function getUtilizationRateWad()
+    function getUtilizationRateWad(uint256 available, uint256 borrowed)
         internal
-        view
+        pure
         returns (bool invalid, uint256 rateWad)
     {
-        // Utilization Rate = (total borrowed) / (total borrowed + total available cash - total collected fees)
-        // Get the current cash
-        uint256 totalAvailableCash = getAvailableCash();
-
         // Utilization rate is 0% when there is no borrowed asset
-        if (totalBorrowed == 0) {
+        if (borrowed == 0) {
             return (false, 0);
         }
-
         // Utilization rate is 100% when there is no cash available
-        if (totalAvailableCash == 0 && totalBorrowed > 0) {
+        if (available == 0 && borrowed > 0) {
             return (false, ONE_WAD);
         }
 
+        // utilization rate = amount borrowed / (amount available + amount borrowed)
         // Perform safe arithmetic with overflow/underflow flagging
-        uint256 z; // temporary variable
-        (invalid, z) = madd(totalAvailableCash, totalBorrowed);
-        if (invalid) return (invalid, z);
-        (invalid, z) = msub(z, totalCollectedFees);
-        if (invalid) return (invalid, z);
-        (invalid, rateWad) = mwdiv(totalBorrowed, z);
+        uint256 totalAmount;
+        (invalid, totalAmount) = madd(available, borrowed);
+        if (invalid) return (invalid, 0);
+        (invalid, rateWad) = mwdiv(borrowed, totalAmount);
+        if (invalid) return (invalid, 0);
         // Capped rateWad
         rateWad = min(rateWad, ONE_WAD);
     }
@@ -240,89 +242,123 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     }
 
     /**
-     * @notice accrueInterest accrues interest to totalBorrowed and totalReserved
-     * @dev This calculates interest accrued from the last checkpointed timestamp
-     *   up to the current timestamp and writes new checkpoint to storage.
+     * @notice getInterestAmount calculate amount of interest based on the total
+     *         borrowed and borrow rate per second.
+     * @param borrowedAmount Total of borrowed amount, in underlying decimals
+     * @param borrowRatePerSecondWad Borrow rates per second, stored as wad number
+     * @param elapsedSeconds Number of seconds elapsed since last collection
+     * @return invalid True if there is an overflow
+     * @return amount The total interest amount, it have similar decimals with
+     *         totalBorrowed and totalCollectedFees. If invalid=true, amount is
+     *         set to zero.
      */
-    function accrueInterest() public {
-        // Get the current timestamp & last timestamp accrued
-        uint256 currentTimestamp = block.timestamp;
-        uint256 previousTimestamp = lastTimestampInterestAccrued;
-
-        // If currentTimestamp and previousTimestamp is similar then return
-        if (currentTimestamp == previousTimestamp) {
-            return;
+    function getInterestAmount(
+        uint256 borrowedAmount,
+        uint256 borrowRatePerSecondWad,
+        uint256 elapsedSeconds
+    ) internal pure returns (bool invalid, uint256 amount) {
+        // Early returns
+        if (
+            borrowedAmount == 0 ||
+            borrowRatePerSecondWad == 0 ||
+            elapsedSeconds == 0
+        ) {
+            return (false, 0);
         }
 
-        // Get the current available cash, total borrowed and total reserved asset
-        // uint256 currentAvailableCash = getAvailableCash();
-        // uint256 currentTotalBorrowed = totalBorrowed;
-        // uint256 currentTotalReserved = totalReserved;
+        // Calculate the amount of interest
+        // interest amount = borrowRatePerSecondWad * elapsedSeconds * borrowedAmount
+        uint256 z; // temporary variable
+        (invalid, z) = mmul(borrowRatePerSecondWad, elapsedSeconds); // output wad; 1e18 precision
+        if (invalid) return (invalid, 0);
+        (invalid, z) = mmul(z, borrowedAmount); // output wad; 1e18 precision
+        if (invalid) return (invalid, 0);
+        amount = z / ONE_WAD; // Convert to underlying precision/decimals
+    }
 
-        // Get the current borrow rate;
-        // bool invalid;
-        // uint256 utilizationRateWad;
-        // (invalid, utilizationRateWad) = getUtilizationRateWad(
-        //     currentAvailableCash,
-        //     currentTotalBorrowed,
-        //     currentTotalReserved
-        // );
-        // // If utilization rate is invalid then emit UtilizationRateInvalid event
-        // if (invalid) {
-        //     emit UtilizationRateInvalid(
-        //         currentAvailableCash,
-        //         currentTotalBorrowed,
-        //         currentTotalReserved,
-        //         utilizationRateWad
-        //     );
-        //     return;
-        // }
+    /**
+     * @notice updateVaultStates update the totalBorrowed and totalCollectedFees
+     * @param interestAmount The total of interest amount to be splitted, the decimals
+     *        is similar to the underlying asset.
+     * @return invalid True if there is an overflow
+     */
+    function updateVaultStates(uint256 interestAmount)
+        internal
+        returns (bool invalid)
+    {
+        // Get the fee
+        uint256 z;
+        (invalid, z) = mmul(PERFORMANCE_FEE_WAD, interestAmount); // In 1e18 precision
+        if (invalid) return invalid;
+        uint256 feeAmount = z / ONE_WAD; // Convert to underlying precision
 
-        // uint256 borrowRatePerSecondWad;
-        // (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-        //     utilizationRateWad
-        // );
-        // // If borrow rate is invalid then emit BorrowRatePerSecondInvalid event
-        // if (invalid) {
-        //     emit BorrowRatePerSecondInvalid(utilizationRateWad);
-        //     return;
-        // }
+        // Get the borrow interest
+        uint256 borrowInterestAmount;
+        (invalid, borrowInterestAmount) = msub(interestAmount, feeAmount);
+        if (invalid) return invalid;
 
-        // // Calculate elapsed timestamp between last accrued
-        // uint256 timestampDelta;
-        // (invalid, timestampDelta) = msub(currentTimestamp, previousTimestamp);
-        // if (invalid) {
-        //     emit TimestampDeltaInvalid(previousTimestamp, currentTimestamp);
-        //     return;
-        // }
+        // Update the states
+        (invalid, totalBorrowed) = madd(totalBorrowed, borrowInterestAmount);
+        if (invalid) return invalid;
+        (invalid, totalCollectedFees) = madd(totalCollectedFees, feeAmount);
+        if (invalid) return invalid;
 
-        /*
-         * Calculate the interest accumulated into borrows and reserves and the new index:
-         *  simpleInterestFactor = borrowRatePerSecond * timestampDelta
-         *  interestAccumulated = simpleInterestFactor * totalBorrows
-         *  totalBorrowsNew = interestAccumulated + totalBorrows
-         *  totalReservesNew = interestAccumulated * reserveFactor + totalReserves
-         *  borrowIndexNew = simpleInterestFactor * borrowIndex + borrowIndex
-         */
-        // uint256 interestFactor;
-        // (invalid, interestFactor) = mwmul(
-        //     borrowRatePerSecondWad,
-        //     timestampDelta
-        // );
-        // if (invalid) return;
+        // Set invalid as false
+        return false;
+    }
 
-        // // interestAccumulated is stored in decimal same as the total borrowed
-        // uint256 interestAccummulated;
-        // (invalid, interestAccummulated) = mwmul(interestFactor, totalBorrowed);
-        // if (invalid) return;
-        // (invalid, interestAccummulated) = mwdiv(interestAccummulated, ONE_WAD);
-        // if (invalid) return;
+    /**
+     * @notice accrueInterest accrues interest to totalBorrowed and totalCollectedFees
+     * @dev This calculates interest accrued from the last checkpointed timestamp
+     *      up to the current timestamp and writes new checkpoint to storage.
+     */
+    function accrueInterest() public returns (bool invalid) {
+        // Get the current timestamp, get last timestamp accrued and set the last time accrued
+        uint256 currentTimestamp = block.timestamp;
+        uint256 previousTimestamp = lastTimestampInterestAccrued;
+        lastTimestampInterestAccrued = currentTimestamp;
 
-        // // Total borrows new
-        // uint256 totalBorrowedNew = interestAccummulated + totalBorrowed;
-        // uint256 totalReserved = sd; // TODO: continue here
-        // // uint256 borrowRatePerSecondWad = getBorrowRatePerSecondWad(
-        // //     utilizationRateWad
-        // // );
+        // If currentTimestamp and previousTimestamp is similar then return early
+        if (currentTimestamp == previousTimestamp) return false;
+
+        // Get total amount available to borrow
+        uint256 totalAvailable = getTotalAvailable();
+
+        // Get current utilization rate
+        uint256 utilizationRateWad;
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            totalAvailable,
+            totalBorrowed
+        );
+        if (invalid) return invalid;
+
+        // Get borrow rate per second
+        uint256 borrowRatePerSecondWad;
+        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
+            utilizationRateWad
+        );
+        if (invalid) return invalid;
+
+        // Get time elapsed since last accrued
+        uint256 elapsedSeconds;
+        (invalid, elapsedSeconds) = msub(currentTimestamp, previousTimestamp);
+        if (invalid) return invalid;
+
+        // Get the interest amount
+        uint256 interestAmount;
+        (invalid, interestAmount) = getInterestAmount(
+            totalBorrowed,
+            borrowRatePerSecondWad,
+            elapsedSeconds
+        );
+        if (invalid) return invalid;
+
+        // Update the vault states based on the interest amount:
+        // totalBorrow & totalCollectedFees
+        invalid = updateVaultStates(interestAmount);
+        if (invalid) return invalid;
+
+        // Set invalid as false
+        return false;
     }
 }
