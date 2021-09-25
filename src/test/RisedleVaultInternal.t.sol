@@ -68,72 +68,72 @@ contract RisedleVaultInternalTest is
         assertEq(vaultTokenMetadata.decimals(), 8);
     }
 
+    /// @notice Make sure getTotalAvailable return correctly
+    function test_GetTotalAvailable() public {
+        uint256 amount;
+        uint256 totalAvailable;
+
+        amount = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(this), amount);
+        totalAvailable = getTotalAvailable();
+        assertEq(totalAvailable, amount);
+
+        amount = 200 * 1e6; // 200 USDT
+        totalCollectedFees = 100 * 1e6; // 100 USDT
+        hevm.setUSDTBalance(address(this), amount);
+        totalAvailable = getTotalAvailable();
+        assertEq(totalAvailable, amount - totalCollectedFees);
+
+        // This most likely never happen; but we need to make sure to handle it
+        // totalCollectedFees > Underlying balance
+        amount = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 105 * 1e6; // 105 USDT
+        hevm.setUSDTBalance(address(this), amount);
+        totalAvailable = getTotalAvailable();
+        assertEq(totalAvailable, 0);
+    }
+
     /// @notice Make sure the Utilization Rate calculation is correct
     function test_GetUtilizationRate() public {
         bool invalid;
         uint256 utilizationRateWad;
 
-        // Initial state: zero available, zero borrowed and zero collected fees
-        hevm.setUSDTBalance(address(this), 0); // Set total available cash to 0
-        totalBorrowed = 0;
-        totalCollectedFees = 0;
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        // Available=0 ; Borrowed=0
+        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 0);
         assertFalse(invalid);
         assertEq(utilizationRateWad, 0);
 
-        // x available, zero borrowed, zero collected fees
-        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
-        totalBorrowed = 0;
-        totalCollectedFees = 0;
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        // Available=100 USDT; Borrowed=0
+        (invalid, utilizationRateWad) = getUtilizationRateWad(100 * 1e6, 0);
         assertFalse(invalid);
         assertEq(utilizationRateWad, 0);
 
-        // x available, y borrowed, zero collected fees
-        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
-        totalBorrowed = 50 * 1e6; // 50 USDT
-        totalCollectedFees = 0;
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        // Available=100 USDT; Borrowed=50 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            100 * 1e6, // 100 USDT
+            50 * 1e6 // 50 USDT
+        );
         assertFalse(invalid);
         assertEq(utilizationRateWad, 333333333333333333); // 0.33 Utilization rate
 
-        // x available, y borrowed, z collected fees
-        hevm.setUSDTBalance(address(this), 100 * 1e6); // Set total available cash to 100 USDT
-        totalBorrowed = 50 * 1e6; // 50 USDT
-        totalCollectedFees = 10 * 1e6; // 10 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        // Available=50 USDT; Borrowed=100 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            50 * 1e6, // 50 USDT
+            100 * 1e6 // 100 USDT
+        );
         assertFalse(invalid);
-        assertEq(utilizationRateWad, 357142857142857143); // 0.35 Utilization rate
+        assertEq(utilizationRateWad, 666666666666666667); // 0.66 Utilization rate
 
-        // x available < y borrowed, zero collected fees
-        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set total available cash to 50 USDT
-        totalBorrowed = 100 * 1e6; // 100 USDT
-        totalCollectedFees = 0;
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, 666666666666666667); // 0.71 Utilization rate
-
-        // More than 100% utilization rate
-        hevm.setUSDTBalance(address(this), 0); // Set total available cash to 0 USDT
-        totalBorrowed = 100 * 1e6; // 100 USDT
-        totalCollectedFees = 10 * 1e6; // 10 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        // Available=0; Borrowed=100 USDT
+        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 100 * 1e6);
         assertFalse(invalid);
         assertEq(utilizationRateWad, ONE_WAD);
 
-        // Total collected fees should not be too large
-        // x available < y borrowed < z reserved
-        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set total available cash to 50 USDT
-        totalBorrowed = 100 * 1e6; // 100 USDT
-        totalCollectedFees = 200 * 1e6; // 200 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
-        assertTrue(invalid);
-
         // Test overflow
-        hevm.setUSDTBalance(address(this), ((2**256) - 1));
-        totalBorrowed = ((2**256) - 1); // 100 USDT
-        totalCollectedFees = 0; // 200 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad();
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            ((2**256) - 1),
+            ((2**256) - 1)
+        );
         assertTrue(invalid);
     }
 
@@ -193,12 +193,72 @@ contract RisedleVaultInternalTest is
         assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
     }
 
-    /// @notice Make sure getAvailableCash return correctly
-    function test_GetAvailableCash() public {
-        // Set USDT balance of this contract
-        uint256 amount = 1000 * 1e6;
-        hevm.setUSDTBalance(address(this), amount);
-        uint256 currentCash = getAvailableCash();
-        assertEq(currentCash, amount);
+    /// @notice Make sure getInterestAmount is correct
+    function test_GetInterestAmount() public {
+        bool invalid;
+        uint256 interestAmount;
+
+        // Total Borrowed: 0
+        // Borrow Rate Per Seconds: 0
+        // Elapsed Seconds: 0
+        // Expected interest amount: 0
+        (invalid, interestAmount) = getInterestAmount(0, 0, 0);
+        assertFalse(invalid);
+        assertEq(interestAmount, 0);
+
+        // Total Borrowed: x
+        // Borrow Rate Per Seconds: 0
+        // Elapsed Seconds: 0
+        // Expected interest amount: 0
+        (invalid, interestAmount) = getInterestAmount(
+            100 * 1e6, // 100 USDT
+            0,
+            0
+        );
+        assertFalse(invalid);
+        assertEq(interestAmount, 0);
+
+        // Total Borrowed: 0
+        // Borrow Rate Per Seconds: 0
+        // Elapsed Seconds: y
+        // Expected interest amount: 0
+        (invalid, interestAmount) = getInterestAmount(0, 0, 20);
+        assertFalse(invalid);
+        assertEq(interestAmount, 0);
+
+        // Total Borrowed: x
+        // Borrow Rate Per Seconds: y
+        // Elapsed Seconds: z
+        // Expected interest amount: 0
+        (invalid, interestAmount) = getInterestAmount(
+            100 * 1e6, // 100 USDT
+            3523310220, // Approx 11.75% APY
+            86400 // 86400 seconds ~ 24 hours
+        );
+        assertFalse(invalid);
+        assertEq(interestAmount, 30441); // in 1e6 precision or 0.0304414003 USDT
+    }
+
+    /// @notice Make sure updateVaultStates update the vault states correctly
+    function test_UpdateVaultStates() public {
+        bool invalid;
+
+        // interestAmount=0
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 5 * 1e6; // 5 USDT
+        invalid = updateVaultStates(0);
+        assertFalse(invalid);
+        // The totalBorrowed & totalCollectedFees should not updated
+        assertEq(totalBorrowed, 100 * 1e6);
+        assertEq(totalCollectedFees, 5 * 1e6);
+
+        // interestAmount=10 USDT
+        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalCollectedFees = 5 * 1e6; // 5 USDT
+        invalid = updateVaultStates(10 * 1e6); // 10 USDT
+        assertFalse(invalid);
+        // The totalBorrowed & totalCollectedFees should be updated
+        assertEq(totalBorrowed, 109000000); // 109 USDT
+        assertEq(totalCollectedFees, 6000000); // 6 USDT
     }
 }
