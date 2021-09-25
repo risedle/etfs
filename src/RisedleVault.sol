@@ -161,6 +161,8 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         (invalid, rateWad) = msub(rateWad, reserved);
         if (invalid) return (invalid, rateWad);
         (invalid, rateWad) = mwdiv(borrowed, rateWad);
+        // Capped rateWad
+        rateWad = min(rateWad, ONE_WAD);
     }
 
     /**
