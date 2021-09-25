@@ -107,6 +107,15 @@ contract RisedleVaultInternalTest is
         assertFalse(invalid);
         assertEq(utilizationRateWad, 666666666666666667); // 0.71 Utilization rate
 
+        // More than 100% utilization rate
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            0,
+            100 * 1e6, // 100 USDT
+            10 * 1e6 // 10 USDT
+        );
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, ONE_WAD);
+
         // Reserved amount should not be too large
         // x available < y borrowed < z reserved
         (invalid, utilizationRateWad) = getUtilizationRateWad(
