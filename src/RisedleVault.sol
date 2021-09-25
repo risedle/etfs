@@ -168,45 +168,58 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /**
      * @notice getBorrowRatePerSecondWad calculates the borrow rate per second.
      * @param utilizationRateWad The current utilization rate, stored as wad
-     * @return The borrow rate as a wad
+     * @return invalid True if overflow/underflow and reserved amount too large
+     * @return borrowRatePerSecondWad Borrow rate per second as Wad
      */
     function getBorrowRatePerSecondWad(uint256 utilizationRateWad)
         internal
         view
-        returns (uint256)
+        returns (bool invalid, uint256 borrowRatePerSecondWad)
     {
+        // utilizationRateWad should in range [0, 1e18], Otherwise return max borrow rate
+        if (utilizationRateWad >= ONE_WAD)
+            return (false, MAX_BORROW_RATE_PER_SECOND_WAD);
+
         // Calculate the borrow rate
+        // See the formula here: https://observablehq.com/@pyk/ethrise
         if (utilizationRateWad <= OPTIMAL_UTILIZATION_RATE_WAD) {
-            uint256 borrowRatePerYearWad = wmul(
-                wdiv(utilizationRateWad, OPTIMAL_UTILIZATION_RATE_WAD),
-                INTEREST_SLOPE_1_WAD
+            uint256 z; // temporary variable
+            (invalid, z) = mwdiv(
+                utilizationRateWad,
+                OPTIMAL_UTILIZATION_RATE_WAD
             );
-            uint256 borrowRatePerSecondWad = wdiv(
-                borrowRatePerYearWad,
-                SECONDS_PER_YEAR_WAD
-            );
-            return borrowRatePerSecondWad;
+            if (invalid) return (invalid, z);
+            (invalid, z) = mwmul(z, INTEREST_SLOPE_1_WAD); // Borrow rate per year
+            if (invalid) return (invalid, z);
+            (invalid, borrowRatePerSecondWad) = mwdiv(z, SECONDS_PER_YEAR_WAD);
+            return (invalid, borrowRatePerSecondWad);
         } else {
-            uint256 borrowRatePerYearWad = add(
-                INTEREST_SLOPE_1_WAD,
-                wmul(
-                    wdiv(
-                        sub(utilizationRateWad, OPTIMAL_UTILIZATION_RATE_WAD),
-                        sub(ONE_WAD, utilizationRateWad)
-                    ),
-                    INTEREST_SLOPE_2_WAD
-                )
+            // temporary variables
+            uint256 x;
+            uint256 y;
+            uint256 z;
+
+            (invalid, x) = msub(
+                utilizationRateWad,
+                OPTIMAL_UTILIZATION_RATE_WAD
             );
-            uint256 borrowRatePerSecondWad = wdiv(
-                borrowRatePerYearWad,
-                SECONDS_PER_YEAR_WAD
-            );
-            // Make sure the borrow rate is not absurd high
-            uint256 cappedBorrowRateWad = min(
+            if (invalid) return (invalid, x);
+            (invalid, y) = msub(ONE_WAD, utilizationRateWad);
+            if (invalid) return (invalid, y);
+            (invalid, z) = mwdiv(x, y);
+            if (invalid) return (invalid, z);
+            (invalid, z) = mwmul(z, INTEREST_SLOPE_2_WAD);
+            if (invalid) return (invalid, z);
+            (invalid, z) = madd(INTEREST_SLOPE_1_WAD, z); // Borrow rate per year
+            if (invalid) return (invalid, z);
+            (invalid, borrowRatePerSecondWad) = mwdiv(z, SECONDS_PER_YEAR_WAD);
+            if (invalid) return (invalid, borrowRatePerSecondWad);
+            // Make sure the borrow rate is not absurdly high
+            uint256 cappedBorrowRatePerSecondWad = min(
                 borrowRatePerSecondWad,
                 MAX_BORROW_RATE_PER_SECOND_WAD
             );
-            return cappedBorrowRateWad;
+            return (false, cappedBorrowRatePerSecondWad);
         }
     }
 
