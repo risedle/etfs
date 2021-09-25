@@ -19,7 +19,7 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
-import {DSMath} from "lib/ds-math/src/math.sol";
+import {DSMath} from "lib/meth/src/math.sol";
 
 /// @title Risedle's Vault
 contract RisedleVault is ERC20, AccessControl, DSMath {
@@ -55,6 +55,12 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
 
     /// @notice 1.0 stored as wad
     uint256 public immutable ONE_WAD = 1000000000000000000;
+
+    /// @notice Maximum borrow rate per second
+    uint256 public immutable MAX_BORROW_RATE_PER_SECOND_WAD = 50735667174; // Approx 393% APY
+
+    /// @notice Timestammp that interest was last accrued at
+    uint256 public lastTimestampInterestAccrued;
 
     /**
      * @notice Contruct new vault
@@ -126,28 +132,35 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
 
     /**
      * @notice getUtilizationRateWad calculates the utilization rate of
-     *         the lending pool.
+     *         the lending pool. If there is an overflow or underflow, simply
+     *         return the value with invalid=true.
      * @param cash The amount of cash available to borrow in the lending pool
      * @param borrowed The amount of borrowed asset in the lending pool
      * @param reserved The amount of reserved asset in the lending pool
-     * @return The utilization rate as a wad
+     * @return invalid True if overflow/underflow and reserved amount too large
+     * @return rateWad The utilization rate as wad, valid if invalid=false
      */
     function getUtilizationRateWad(
         uint256 cash,
         uint256 borrowed,
         uint256 reserved
-    ) public pure returns (uint256) {
+    ) public pure returns (bool invalid, uint256 rateWad) {
         // Utilization rate is 0% when there is no borrowed asset
         if (borrowed == 0) {
-            return 0;
+            return (false, 0);
         }
         // Utilization rate is 100% when there is no cash available
-        if (cash == 0) {
-            return 1 * 1e18;
+        if (cash == 0 && borrowed > 0) {
+            return (false, ONE_WAD);
         }
 
         // Ut = Bt/(Ct + Bt - Rt)
-        return wdiv(borrowed, sub(add(cash, borrowed), reserved));
+        // Perform safe arithmetic with overflow/underflow flagging
+        (invalid, rateWad) = madd(cash, borrowed);
+        if (invalid) return (invalid, rateWad);
+        (invalid, rateWad) = msub(rateWad, reserved);
+        if (invalid) return (invalid, rateWad);
+        (invalid, rateWad) = mwdiv(borrowed, rateWad);
     }
 
     /**
@@ -166,7 +179,11 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
                 wdiv(utilizationRateWad, OPTIMAL_UTILIZATION_RATE_WAD),
                 INTEREST_SLOPE_1_WAD
             );
-            return wdiv(borrowRatePerYearWad, SECONDS_PER_YEAR_WAD);
+            uint256 borrowRatePerSecondWad = wdiv(
+                borrowRatePerYearWad,
+                SECONDS_PER_YEAR_WAD
+            );
+            return borrowRatePerSecondWad;
         } else {
             uint256 borrowRatePerYearWad = add(
                 INTEREST_SLOPE_1_WAD,
@@ -178,7 +195,47 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
                     INTEREST_SLOPE_2_WAD
                 )
             );
-            return wdiv(borrowRatePerYearWad, SECONDS_PER_YEAR_WAD);
+            uint256 borrowRatePerSecondWad = wdiv(
+                borrowRatePerYearWad,
+                SECONDS_PER_YEAR_WAD
+            );
+            // Make sure the borrow rate is not absurd high
+            uint256 cappedBorrowRateWad = min(
+                borrowRatePerSecondWad,
+                MAX_BORROW_RATE_PER_SECOND_WAD
+            );
+            return cappedBorrowRateWad;
         }
+    }
+
+    /**
+     * @notice accrueInterest accrues interest to totalBorrowed and totalReserved
+     * @dev This calculates interest accrued from the last checkpointed timestamp
+     *   up to the current timestamp and writes new checkpoint to storage.
+     */
+    function accrueInterest() public {
+        // Get the current timestamp & last timestamp accrued
+        uint256 currentTimestamp = block.timestamp;
+        uint256 previousTimestamp = lastTimestampInterestAccrued;
+
+        // If currentTimestamp and previousTimestamp is similar then return
+        if (currentTimestamp == previousTimestamp) {
+            return;
+        }
+
+        // Get the current available cash, total borrowed and total reserved asset
+        uint256 currentAvailableCash = getAvailableCash();
+        uint256 currentTotalBorrowed = totalBorrowed;
+        uint256 currentTotalReserved = totalReserved;
+
+        // Get the current borrow rate;
+        // uint256 utilizationRateWad = getUtilizationRateWad(
+        //     currentAvailableCash,
+        //     currentTotalBorrowed,
+        //     currentTotalReserved
+        // );
+        // uint256 borrowRatePerSecondWad = getBorrowRatePerSecondWad(
+        //     utilizationRateWad
+        // );
     }
 }
