@@ -32,13 +32,13 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     address public immutable underlying;
 
     /// @notice The vault's admin address
-    address public immutable admin;
+    address public admin;
 
-    /// @notice The total amount of borrowed assets
+    /// @notice The total amount of borrowed assets in the vault
     uint256 public totalBorrowed;
 
-    /// @notice The total amount of reserved assets
-    uint256 public totalReserved;
+    /// @notice The total amount of collected fees in the vault
+    uint256 public totalCollectedFees;
 
     /// @notice Optimal utilization rate stored in wad
     ///         For example, 90% or 0.9 is equal to
@@ -53,7 +53,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /// @notice Number of seconds in a year, stored in wad
     uint256 public immutable SECONDS_PER_YEAR_WAD = 31536000000000000000000000;
 
-    /// @notice 1.0 stored as wad
+    /// @notice 1.0 stored as wad, 1e18 precision
     uint256 public immutable ONE_WAD = 1000000000000000000;
 
     /// @notice Maximum borrow rate per second
@@ -61,6 +61,20 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
 
     /// @notice Timestammp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
+
+    /// @notice Event emitted when the utulization rate is invalid
+    event UtiliationRateInvalid(
+        uint256 cash,
+        uint256 borrowed,
+        uint256 reserved,
+        uint256 rate
+    );
+
+    /// @notice Event emitted when the borrow rate is invalid
+    event BorrowRatePerSecondInvalid(uint256 utilizationRateWad);
+
+    /// @notice Event emitted then failed to calculate the timestamp delta
+    event TimestampDeltaInvalid(uint256 previous, uint256 current);
 
     /**
      * @notice Contruct new vault
@@ -132,35 +146,37 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
 
     /**
      * @notice getUtilizationRateWad calculates the utilization rate of
-     *         the lending pool. If there is an overflow or underflow, simply
+     *         the vault. If there is an overflow or underflow, simply
      *         return the value with invalid=true.
-     * @param cash The amount of cash available to borrow in the lending pool
-     * @param borrowed The amount of borrowed asset in the lending pool
-     * @param reserved The amount of reserved asset in the lending pool
      * @return invalid True if overflow/underflow and reserved amount too large
      * @return rateWad The utilization rate as wad, valid if invalid=false
      */
-    function getUtilizationRateWad(
-        uint256 cash,
-        uint256 borrowed,
-        uint256 reserved
-    ) public pure returns (bool invalid, uint256 rateWad) {
+    function getUtilizationRateWad()
+        internal
+        view
+        returns (bool invalid, uint256 rateWad)
+    {
+        // Utilization Rate = (total borrowed) / (total borrowed + total available cash - total collected fees)
+        // Get the current cash
+        uint256 totalAvailableCash = getAvailableCash();
+
         // Utilization rate is 0% when there is no borrowed asset
-        if (borrowed == 0) {
+        if (totalBorrowed == 0) {
             return (false, 0);
         }
+
         // Utilization rate is 100% when there is no cash available
-        if (cash == 0 && borrowed > 0) {
+        if (totalAvailableCash == 0 && totalBorrowed > 0) {
             return (false, ONE_WAD);
         }
 
-        // Ut = Bt/(Ct + Bt - Rt)
         // Perform safe arithmetic with overflow/underflow flagging
-        (invalid, rateWad) = madd(cash, borrowed);
-        if (invalid) return (invalid, rateWad);
-        (invalid, rateWad) = msub(rateWad, reserved);
-        if (invalid) return (invalid, rateWad);
-        (invalid, rateWad) = mwdiv(borrowed, rateWad);
+        uint256 z; // temporary variable
+        (invalid, z) = madd(totalAvailableCash, totalBorrowed);
+        if (invalid) return (invalid, z);
+        (invalid, z) = msub(z, totalCollectedFees);
+        if (invalid) return (invalid, z);
+        (invalid, rateWad) = mwdiv(totalBorrowed, z);
         // Capped rateWad
         rateWad = min(rateWad, ONE_WAD);
     }
@@ -239,18 +255,74 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         }
 
         // Get the current available cash, total borrowed and total reserved asset
-        uint256 currentAvailableCash = getAvailableCash();
-        uint256 currentTotalBorrowed = totalBorrowed;
-        uint256 currentTotalReserved = totalReserved;
+        // uint256 currentAvailableCash = getAvailableCash();
+        // uint256 currentTotalBorrowed = totalBorrowed;
+        // uint256 currentTotalReserved = totalReserved;
 
         // Get the current borrow rate;
-        // uint256 utilizationRateWad = getUtilizationRateWad(
+        // bool invalid;
+        // uint256 utilizationRateWad;
+        // (invalid, utilizationRateWad) = getUtilizationRateWad(
         //     currentAvailableCash,
         //     currentTotalBorrowed,
         //     currentTotalReserved
         // );
-        // uint256 borrowRatePerSecondWad = getBorrowRatePerSecondWad(
+        // // If utilization rate is invalid then emit UtilizationRateInvalid event
+        // if (invalid) {
+        //     emit UtilizationRateInvalid(
+        //         currentAvailableCash,
+        //         currentTotalBorrowed,
+        //         currentTotalReserved,
+        //         utilizationRateWad
+        //     );
+        //     return;
+        // }
+
+        // uint256 borrowRatePerSecondWad;
+        // (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
         //     utilizationRateWad
         // );
+        // // If borrow rate is invalid then emit BorrowRatePerSecondInvalid event
+        // if (invalid) {
+        //     emit BorrowRatePerSecondInvalid(utilizationRateWad);
+        //     return;
+        // }
+
+        // // Calculate elapsed timestamp between last accrued
+        // uint256 timestampDelta;
+        // (invalid, timestampDelta) = msub(currentTimestamp, previousTimestamp);
+        // if (invalid) {
+        //     emit TimestampDeltaInvalid(previousTimestamp, currentTimestamp);
+        //     return;
+        // }
+
+        /*
+         * Calculate the interest accumulated into borrows and reserves and the new index:
+         *  simpleInterestFactor = borrowRatePerSecond * timestampDelta
+         *  interestAccumulated = simpleInterestFactor * totalBorrows
+         *  totalBorrowsNew = interestAccumulated + totalBorrows
+         *  totalReservesNew = interestAccumulated * reserveFactor + totalReserves
+         *  borrowIndexNew = simpleInterestFactor * borrowIndex + borrowIndex
+         */
+        // uint256 interestFactor;
+        // (invalid, interestFactor) = mwmul(
+        //     borrowRatePerSecondWad,
+        //     timestampDelta
+        // );
+        // if (invalid) return;
+
+        // // interestAccumulated is stored in decimal same as the total borrowed
+        // uint256 interestAccummulated;
+        // (invalid, interestAccummulated) = mwmul(interestFactor, totalBorrowed);
+        // if (invalid) return;
+        // (invalid, interestAccummulated) = mwdiv(interestAccummulated, ONE_WAD);
+        // if (invalid) return;
+
+        // // Total borrows new
+        // uint256 totalBorrowedNew = interestAccummulated + totalBorrowed;
+        // uint256 totalReserved = sd; // TODO: continue here
+        // // uint256 borrowRatePerSecondWad = getBorrowRatePerSecondWad(
+        // //     utilizationRateWad
+        // // );
     }
 }
