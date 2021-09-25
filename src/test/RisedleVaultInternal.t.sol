@@ -48,6 +48,9 @@ contract RisedleVaultInternalTest is
         // Make sure the seconds per year is set
         assertEq(SECONDS_PER_YEAR_WAD, 31536000000000000000000000);
 
+        // Make sure max borrow rate is set
+        assertEq(MAX_BORROW_RATE_PER_SECOND_WAD, 50735667174); // Approx 393% APY
+
         // Make sure one wad correctly set
         assertEq(ONE_WAD, 1e18);
 
@@ -60,41 +63,66 @@ contract RisedleVaultInternalTest is
 
     /// @notice Make sure the Utilization Rate calculation is correct
     function test_GetUtilizationRate() public {
-        // Test zero utilization rate, with reserved = 0
-        uint256 availableCashUSDT1 = 100 * 1e6; // 100 USDT, USDT is 6 decimals
-        uint256 borrowedUSDT1 = 0 * 1e6; // 0 USDT
-        uint256 reservedUSDT1 = 0 * 1e6; // 0 USDT
-        uint256 expectedUtilizationRateAsWad1 = 0; // 0%
-        uint256 utilizationRateAsWad1 = getUtilizationRateWad(
-            availableCashUSDT1,
-            borrowedUSDT1,
-            reservedUSDT1
-        );
-        assertEq(utilizationRateAsWad1, expectedUtilizationRateAsWad1);
+        bool invalid;
+        uint256 utilizationRateWad;
 
-        // Test ~33% utilization rate
-        uint256 availableCashUSDT2 = 100 * 1e6; // 100 USDT, USDT is 6 decimals
-        uint256 borrowedUSDT2 = 50 * 1e6; // 50 USDT
-        uint256 reservedUSDT2 = 1 * 1e6; // 1 USDT
-        uint256 expectedUtilizationRateAsWad2 = 335570469798657718; // 33.55%
-        uint256 utilizationRateAsWad2 = getUtilizationRateWad(
-            availableCashUSDT2,
-            borrowedUSDT2,
-            reservedUSDT2
-        );
-        assertEq(utilizationRateAsWad2, expectedUtilizationRateAsWad2);
+        // Initial state: zero available, zero borrowed and zero reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 0, 0);
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, 0);
 
-        // Test 100% utilization rate
-        uint256 availableCashUSDT3 = 0 * 1e6; // 0 USDT, USDT is 6 decimals
-        uint256 borrowedUSDT3 = 50 * 1e6; // 50 USDT
-        uint256 reservedUSDT3 = 1 * 1e6; // 1 USDT
-        uint256 expectedUtilizationRateAsWad3 = 1 * 1e18; // 100%
-        uint256 utilizationRateAsWad3 = getUtilizationRateWad(
-            availableCashUSDT3,
-            borrowedUSDT3,
-            reservedUSDT3
+        // x available, zero borrowed, zero reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            100 * 1e6, // 100USDT
+            0,
+            0
         );
-        assertEq(utilizationRateAsWad3, expectedUtilizationRateAsWad3);
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, 0);
+
+        // x available, y borrowed, zero reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            100 * 1e6, // 100USDT
+            50 * 1e6, // 50 USDT
+            0
+        );
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, 333333333333333333); // 0.33 Utilization rate
+
+        // x available, y borrowed, z reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            100 * 1e6, // 100USDT
+            50 * 1e6, // 50 USDT
+            10 * 1e6 // 10 USDT reserved
+        );
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, 357142857142857143); // 0.35 Utilization rate
+
+        // x available < y borrowed, zero reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            50 * 1e6, // 50USDT
+            100 * 1e6, // 50 USDT
+            0
+        );
+        assertFalse(invalid);
+        assertEq(utilizationRateWad, 666666666666666667); // 0.71 Utilization rate
+
+        // Reserved amount should not be too large
+        // x available < y borrowed < z reserved
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            50 * 1e6, // 50USDT
+            100 * 1e6, // 50 USDT
+            200 * 1e6 // 200 USDT
+        );
+        assertTrue(invalid);
+
+        // Test overflow
+        (invalid, utilizationRateWad) = getUtilizationRateWad(
+            ((2**256) - 1),
+            ((2**256) - 1),
+            0
+        );
+        assertTrue(invalid);
     }
 
     /// @notice Make sure the borrow rate calculation is correct
@@ -112,8 +140,6 @@ contract RisedleVaultInternalTest is
         uint256 borrowRatePerSecondWad1 = getBorrowRatePerSecondWad(
             utilizationRateWad1
         );
-
-        // Make sure the calculation is correct
         assertEq(borrowRatePerSecondWad1, expectedBorrowRatePerSecondWad1);
 
         // Set utilization rate
@@ -124,8 +150,13 @@ contract RisedleVaultInternalTest is
         uint256 borrowRatePerSecondWad2 = getBorrowRatePerSecondWad(
             utilizationRateWad2
         );
-
-        // Make sure the calculation is correct
         assertEq(borrowRatePerSecondWad2, expectedBorrowRatePerSecondWad2);
+
+        // Make sure capped borrow rate works
+        uint256 utilizationRateWad3 = 970000000000000000; // 97%
+        uint256 borrowRatePerSecondWad3 = getBorrowRatePerSecondWad(
+            utilizationRateWad3
+        );
+        assertEq(borrowRatePerSecondWad3, MAX_BORROW_RATE_PER_SECOND_WAD);
     }
 }
