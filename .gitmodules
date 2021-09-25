@@ -5,6 +5,3 @@
 	path = lib/ds-test
 	url = https://github.com/risedle/ds-test
 	branch = master
-[submodule "lib/ds-math"]
-	path = lib/ds-math
-	url = https://github.com/dapphub/ds-math
