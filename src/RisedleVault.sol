@@ -62,22 +62,8 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /// @notice Performance fee for the lender
     uint256 public PERFORMANCE_FEE_WAD = 100000000000000000; // 10% performance fee
 
-    /// @notice Timestammp that interest was last accrued at
+    /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
-
-    /// @notice Event emitted when the utulization rate is invalid
-    event UtiliationRateInvalid(
-        uint256 cash,
-        uint256 borrowed,
-        uint256 reserved,
-        uint256 rate
-    );
-
-    /// @notice Event emitted when the borrow rate is invalid
-    event BorrowRatePerSecondInvalid(uint256 utilizationRateWad);
-
-    /// @notice Event emitted then failed to calculate the timestamp delta
-    event TimestampDeltaInvalid(uint256 previous, uint256 current);
 
     /**
      * @notice Contruct new vault
