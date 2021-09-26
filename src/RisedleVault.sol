@@ -393,7 +393,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @param amount The amount of the underlying asset to supply
      */
     function mint(uint256 amount) external nonReentrant {
-        // Accrue interest, emit events if something bad happen
+        // Accrue interest
         accrueInterest();
 
         // Get the exchange rate
@@ -407,7 +407,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther;
 
         // Send vault token to the lender
-        _mint(msg.sender, mintedAmount); // rvToken is 18 decimals
+        _mint(msg.sender, mintedAmount);
 
         // Emit event
         emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
