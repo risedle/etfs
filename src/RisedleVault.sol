@@ -21,10 +21,9 @@ import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/e
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-import {DSMath} from "lib/meth/src/math.sol";
 
 /// @title Risedle's Vault
-contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
+contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice Only valid borrower can borrow and repay underlying assets
