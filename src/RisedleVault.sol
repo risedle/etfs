@@ -44,6 +44,10 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice The total amount of principal borrowed plus interest accrued
     uint256 public totalOutstandingDebt;
 
+    /// @notice Mapping borrower to their borrow amount
+    /// @dev total debts per borrower = (totalOutstandingDebts / totalPrincipalBorrowed) * principalBorrowed[borrower]
+    mapping(address => uint256) private _principalBorrowed;
+
     /// @notice The total amount of collected fees in the vault
     uint256 public totalCollectedFees;
 
@@ -97,6 +101,13 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 amount,
         uint256 ExchangeRateInEther,
         uint256 redeemedAmount
+    );
+
+    /// @notice Event emitted when borrower borrow from the vault
+    event UnderlyingAssetBorrowed(
+        address indexed account,
+        uint256 amount,
+        uint256 totalOutstandingDebt
     );
 
     /**
@@ -451,5 +462,51 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
             exchangeRateInEther,
             redeemedAmount
         );
+    }
+
+    /**
+     * @notice getOutstandingDebt returns the debt owed by the borrower
+     * @param account The borrower address
+     */
+    function getOutstandingDebt(address account)
+        external
+        view
+        returns (uint256)
+    {
+        // Calculate the outstanding debt
+        // outstanding debt = ()
+        uint256 debtRateEther = (totalOutstandingDebt * 1 ether) /
+            totalPrincipalBorrowed;
+        uint256 outstandingDebt = (debtRateEther *
+            _principalBorrowed[account]) / 1 ether;
+        return outstandingDebt;
+    }
+
+    /**
+     * @notice Borrower borrow asset from the vault. Only valid borrowers are
+     *         allowed to borrow.
+     * @param amount The amount of underlying asset to borrow
+     */
+    function borrow(uint256 amount)
+        external
+        nonReentrant
+        onlyRole(BORROWER_ROLE)
+    {
+        // Accrue interest
+        accrueInterest();
+
+        // Do the accounting
+        totalOutstandingDebt = totalOutstandingDebt + amount;
+        totalPrincipalBorrowed = totalPrincipalBorrowed + amount;
+        _principalBorrowed[msg.sender] =
+            _principalBorrowed[msg.sender] +
+            amount;
+
+        // Transfer underlying asset from the vault to the borrower
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.safeTransfer(msg.sender, amount);
+
+        // Emit event
+        emit UnderlyingAssetBorrowed(msg.sender, amount, totalOutstandingDebt);
     }
 }
