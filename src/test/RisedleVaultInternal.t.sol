@@ -65,7 +65,7 @@ contract RisedleVaultInternalTest is
         IERC20Metadata vaultTokenMetadata = IERC20Metadata(address(this));
         assertEq(vaultTokenMetadata.name(), vaultTokenName);
         assertEq(vaultTokenMetadata.symbol(), vaultTokenSymbol);
-        assertEq(vaultTokenMetadata.decimals(), 18); // Default decimals
+        assertEq(vaultTokenMetadata.decimals(), 6); // Equal to USDT decimals
 
         // Make sure the total supply is set to zero
         assertEq(getVaultTokenTotalSupply(), 0);
