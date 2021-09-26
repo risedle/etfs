@@ -65,6 +65,43 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
 
+    /// @notice Event emitted when get utilization rate is invalid
+    event UtilizationRateInvalid(uint256 totalAvailable, uint256 totalBorrowed);
+
+    /// @notice Event emitted when get borrow rate is invalid
+    event BorrowRateInvalid(uint256 utilizationRateWad);
+
+    /// @notice Event emitted when the elapsed seconds is invalid
+    event ElapsedSecondsInvalid(
+        uint256 currentTimestamp,
+        uint256 previousTimestamp
+    );
+
+    /// @notice Event emitted when the interest amount is invalid
+    event InterestAmountInvalid(
+        uint256 totalBorrowed,
+        uint256 borrowRatePerSecondWad,
+        uint256 elapsedSeconds
+    );
+
+    /// @notice Event emitted when the vault states invalid
+    event UpdateVaultStateFailed(uint256 interestAmount);
+
+    /// @notice Event emitted when the interest succesfully accrued
+    event InterestAccrued(
+        uint256 previousTimestamp,
+        uint256 currentTimestamp,
+        uint256 previousTotalBorrowed,
+        uint256 previousTotalCollectedFees,
+        uint256 totalAvailable,
+        uint256 utilizationRateWad,
+        uint256 borrowRatePerSecondWad,
+        uint256 elapsedSeconds,
+        uint256 interestAmount,
+        uint256 totalBorrowed,
+        uint256 totalCollectedFees
+    );
+
     /**
      * @notice Contruct new vault
      * @param name The vault's token name
@@ -307,6 +344,10 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         // If currentTimestamp and previousTimestamp is similar then return early
         if (currentTimestamp == previousTimestamp) return false;
 
+        // For logging purpose
+        uint256 previousTotalBorrowed = totalBorrowed;
+        uint256 previousTotalCollectedFees = totalCollectedFees;
+
         // Get total amount available to borrow
         uint256 totalAvailable = getTotalAvailable();
 
@@ -316,19 +357,28 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
             totalAvailable,
             totalBorrowed
         );
-        if (invalid) return invalid;
+        if (invalid) {
+            emit UtilizationRateInvalid(totalAvailable, totalBorrowed);
+            return invalid;
+        }
 
         // Get borrow rate per second
         uint256 borrowRatePerSecondWad;
         (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
             utilizationRateWad
         );
-        if (invalid) return invalid;
+        if (invalid) {
+            emit BorrowRateInvalid(utilizationRateWad);
+            return invalid;
+        }
 
         // Get time elapsed since last accrued
         uint256 elapsedSeconds;
         (invalid, elapsedSeconds) = msub(currentTimestamp, previousTimestamp);
-        if (invalid) return invalid;
+        if (invalid) {
+            emit ElapsedSecondsInvalid(currentTimestamp, previousTimestamp);
+            return invalid;
+        }
 
         // Get the interest amount
         uint256 interestAmount;
@@ -337,13 +387,37 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
             borrowRatePerSecondWad,
             elapsedSeconds
         );
-        if (invalid) return invalid;
+        if (invalid) {
+            emit InterestAmountInvalid(
+                totalBorrowed,
+                borrowRatePerSecondWad,
+                elapsedSeconds
+            );
+            return invalid;
+        }
 
         // Update the vault states based on the interest amount:
         // totalBorrow & totalCollectedFees
         invalid = updateVaultStates(interestAmount);
-        if (invalid) return invalid;
+        if (invalid) {
+            emit UpdateVaultStateFailed(interestAmount);
+            return invalid;
+        }
 
+        // Otherwise emit event
+        emit InterestAccrued(
+            previousTimestamp,
+            currentTimestamp,
+            previousTotalBorrowed,
+            previousTotalCollectedFees,
+            totalAvailable,
+            utilizationRateWad,
+            borrowRatePerSecondWad,
+            elapsedSeconds,
+            interestAmount,
+            totalBorrowed,
+            totalCollectedFees
+        );
         // Set invalid as false
         return false;
     }
