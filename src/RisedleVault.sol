@@ -175,11 +175,11 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     }
 
     /**
-     * @notice getTotalAvailable returns the total amount of underlying asset
+     * @notice getTotalAvailableCash returns the total amount of underlying asset
      *         that available to borrow
      * @return The amount of underlying asset ready to borrow
      */
-    function getTotalAvailable() internal view returns (uint256) {
+    function getTotalAvailableCash() internal view returns (uint256) {
         IERC20 underlyingToken = IERC20(underlying);
         uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
         if (totalCollectedFees >= underlyingBalance) return 0;
@@ -362,7 +362,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         uint256 previousTotalCollectedFees = totalCollectedFees;
 
         // Get total amount available to borrow
-        uint256 totalAvailable = getTotalAvailable();
+        uint256 totalAvailable = getTotalAvailableCash();
 
         // Get current utilization rate
         uint256 utilizationRateWad;
@@ -461,7 +461,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
             return ONE_WAD;
         } else {
             // Otherwise: exchangeRate = (totalAvailable + totalBorrowed) / totalSupply
-            uint256 totalAvailable = getTotalAvailable();
+            uint256 totalAvailable = getTotalAvailableCash();
             uint256 totalAllUnderlyingAssetAmount = add(
                 totalAvailable,
                 totalBorrowed

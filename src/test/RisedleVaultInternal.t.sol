@@ -71,20 +71,20 @@ contract RisedleVaultInternalTest is
         assertEq(getVaultTokenTotalSupply(), 0);
     }
 
-    /// @notice Make sure getTotalAvailable return correctly
-    function test_GetTotalAvailable() public {
+    /// @notice Make sure getTotalAvailableCash return correctly
+    function test_GetTotalAvailableCash() public {
         uint256 amount;
         uint256 totalAvailable;
 
         amount = 1000 * 1e6; // 1000 USDT
         hevm.setUSDTBalance(address(this), amount);
-        totalAvailable = getTotalAvailable();
+        totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, amount);
 
         amount = 200 * 1e6; // 200 USDT
         totalCollectedFees = 100 * 1e6; // 100 USDT
         hevm.setUSDTBalance(address(this), amount);
-        totalAvailable = getTotalAvailable();
+        totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, amount - totalCollectedFees);
 
         // This most likely never happen; but we need to make sure to handle it
@@ -92,14 +92,14 @@ contract RisedleVaultInternalTest is
         amount = 100 * 1e6; // 100 USDT
         totalCollectedFees = 105 * 1e6; // 105 USDT
         hevm.setUSDTBalance(address(this), amount);
-        totalAvailable = getTotalAvailable();
+        totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, 0);
 
         // Test with very high number
         amount = 100 * 1e12 * 1e6; // 100 trillion USDT
         totalCollectedFees = 90 * 1e12 * 1e6; // 90 trillion USDT
         hevm.setUSDTBalance(address(this), amount);
-        totalAvailable = getTotalAvailable();
+        totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, 10 * 1e12 * 1e6); // 10 trillion USDT
     }
 
