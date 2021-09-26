@@ -41,6 +41,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice The total amount of borrowed assets in the vault
     uint256 public totalPrincipalBorrowed;
 
+    /// @notice The total amount of principal borrowed plus interest accrued
+    uint256 public totalOutstandingDebt;
+
     /// @notice The total amount of collected fees in the vault
     uint256 public totalCollectedFees;
 
