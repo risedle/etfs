@@ -4,8 +4,8 @@
 // The money market protocol that powers Risedle ETFs.
 //
 // The interest rate model is available here: https://observablehq.com/@pyk/ethrise
-// It uses wad, a decimal number with 18 digits of precision, to represent the
-// interest rate.
+// Risedle uses ether units (1e18) precision to represent the interest rates.
+// Learn more here: https://docs.soliditylang.org/en/v0.8.7/units-and-global-variables.html
 //
 // I wrote this for ETHOnline Hackathon 2021. Enjoy.
 
@@ -70,11 +70,8 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
 
-    /// @notice Event emitted when get utilization rate is invalid
-    event UtilizationRateInvalid(uint256 totalAvailable, uint256 totalBorrowed);
-
     /// @notice Event emitted when get borrow rate is invalid
-    event BorrowRateInvalid(uint256 utilizationRateWad);
+    event BorrowRateInvalid(uint256 utilizationRateInEther);
 
     /// @notice Event emitted when the elapsed seconds is invalid
     event ElapsedSecondsInvalid(
@@ -99,7 +96,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         uint256 previousTotalBorrowed,
         uint256 previousTotalCollectedFees,
         uint256 totalAvailable,
-        uint256 utilizationRateWad,
+        uint256 utilizationRateInEther,
         uint256 borrowRatePerSecondWad,
         uint256 elapsedSeconds,
         uint256 interestAmount,
@@ -187,60 +184,49 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     }
 
     /**
-     * @notice getUtilizationRateWad calculates the utilization rate of
-     *         the vault. If there is an overflow or underflow, simply
-     *         return 0 with invalid=true.
+     * @notice getUtilizationRateInEther calculates the utilization rate of
+     *         the vault.
      * @param available The amount of cash available to borrow in the vault
      * @param borrowed The amount of borrowed asset in the vault
-     * @return invalid True if overflow/underflow and reserved amount too large
-     * @return rateWad The utilization rate as wad, valid if invalid=false
+     * @return The utilization rate in ether units
      */
-    function getUtilizationRateWad(uint256 available, uint256 borrowed)
+    function getUtilizationRateInEther(uint256 available, uint256 borrowed)
         internal
         pure
-        returns (bool invalid, uint256 rateWad)
+        returns (uint256)
     {
         // Utilization rate is 0% when there is no borrowed asset
-        if (borrowed == 0) {
-            return (false, 0);
-        }
+        if (borrowed == 0) return 0;
+
         // Utilization rate is 100% when there is no cash available
-        if (available == 0 && borrowed > 0) {
-            return (false, ONE_WAD);
-        }
+        if (available == 0 && borrowed > 0) return 1 ether;
 
         // utilization rate = amount borrowed / (amount available + amount borrowed)
-        // Perform safe arithmetic with overflow/underflow flagging
-        uint256 totalAmount;
-        (invalid, totalAmount) = madd(available, borrowed);
-        if (invalid) return (invalid, 0);
-        (invalid, rateWad) = mwdiv(borrowed, totalAmount);
-        if (invalid) return (invalid, 0);
-        // Capped rateWad
-        rateWad = min(rateWad, ONE_WAD);
+        uint256 rateInEther = (borrowed * 1 ether) / (borrowed + available);
+        return rateInEther;
     }
 
     /**
      * @notice getBorrowRatePerSecondWad calculates the borrow rate per second.
-     * @param utilizationRateWad The current utilization rate, stored as wad
+     * @param utilizationRateInEther The current utilization rate, stored as wad
      * @return invalid True if overflow/underflow and reserved amount too large
      * @return borrowRatePerSecondWad Borrow rate per second as Wad
      */
-    function getBorrowRatePerSecondWad(uint256 utilizationRateWad)
+    function getBorrowRatePerSecondWad(uint256 utilizationRateInEther)
         internal
         view
         returns (bool invalid, uint256 borrowRatePerSecondWad)
     {
-        // utilizationRateWad should in range [0, 1e18], Otherwise return max borrow rate
-        if (utilizationRateWad >= ONE_WAD)
+        // utilizationRateInEther should in range [0, 1e18], Otherwise return max borrow rate
+        if (utilizationRateInEther >= ONE_WAD)
             return (false, MAX_BORROW_RATE_PER_SECOND_WAD);
 
         // Calculate the borrow rate
         // See the formula here: https://observablehq.com/@pyk/ethrise
-        if (utilizationRateWad <= OPTIMAL_UTILIZATION_RATE_WAD) {
+        if (utilizationRateInEther <= OPTIMAL_UTILIZATION_RATE_WAD) {
             uint256 z; // temporary variable
             (invalid, z) = mwdiv(
-                utilizationRateWad,
+                utilizationRateInEther,
                 OPTIMAL_UTILIZATION_RATE_WAD
             );
             if (invalid) return (invalid, z);
@@ -255,11 +241,11 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
             uint256 z;
 
             (invalid, x) = msub(
-                utilizationRateWad,
+                utilizationRateInEther,
                 OPTIMAL_UTILIZATION_RATE_WAD
             );
             if (invalid) return (invalid, x);
-            (invalid, y) = msub(ONE_WAD, utilizationRateWad);
+            (invalid, y) = msub(ONE_WAD, utilizationRateInEther);
             if (invalid) return (invalid, y);
             (invalid, z) = mwdiv(x, y);
             if (invalid) return (invalid, z);
@@ -365,23 +351,18 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         uint256 totalAvailable = getTotalAvailableCash();
 
         // Get current utilization rate
-        uint256 utilizationRateWad;
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
+        uint256 utilizationRateInEther = getUtilizationRateInEther(
             totalAvailable,
             totalBorrowed
         );
-        if (invalid) {
-            emit UtilizationRateInvalid(totalAvailable, totalBorrowed);
-            return invalid;
-        }
 
         // Get borrow rate per second
         uint256 borrowRatePerSecondWad;
         (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            utilizationRateWad
+            utilizationRateInEther
         );
         if (invalid) {
-            emit BorrowRateInvalid(utilizationRateWad);
+            emit BorrowRateInvalid(utilizationRateInEther);
             return invalid;
         }
 
@@ -425,7 +406,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
             previousTotalBorrowed,
             previousTotalCollectedFees,
             totalAvailable,
-            utilizationRateWad,
+            utilizationRateInEther,
             borrowRatePerSecondWad,
             elapsedSeconds,
             interestAmount,

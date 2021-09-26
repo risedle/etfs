@@ -104,47 +104,41 @@ contract RisedleVaultInternalTest is
     }
 
     /// @notice Make sure the Utilization Rate calculation is correct
-    function test_GetUtilizationRate() public {
-        bool invalid;
-        uint256 utilizationRateWad;
+    function test_GetUtilizationRateInEther() public {
+        uint256 utilizationRateInEther;
 
         // Available=0 ; Borrowed=0
-        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 0);
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, 0);
+        utilizationRateInEther = getUtilizationRateInEther(0, 0);
+        assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Borrowed=0
-        (invalid, utilizationRateWad) = getUtilizationRateWad(100 * 1e6, 0);
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, 0);
+        utilizationRateInEther = getUtilizationRateInEther(100 * 1e6, 0);
+        assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Borrowed=50 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
+        utilizationRateInEther = getUtilizationRateInEther(
             100 * 1e6, // 100 USDT
             50 * 1e6 // 50 USDT
         );
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, 333333333333333333); // 0.33 Utilization rate
+        assertEq(utilizationRateInEther, 333333333333333333); // 0.33 Utilization rate
 
         // Available=50 USDT; Borrowed=100 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
+        utilizationRateInEther = getUtilizationRateInEther(
             50 * 1e6, // 50 USDT
             100 * 1e6 // 100 USDT
         );
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, 666666666666666667); // 0.66 Utilization rate
+        assertEq(utilizationRateInEther, 666666666666666666); // 0.66 Utilization rate
 
         // Available=0; Borrowed=100 USDT
-        (invalid, utilizationRateWad) = getUtilizationRateWad(0, 100 * 1e6);
-        assertFalse(invalid);
-        assertEq(utilizationRateWad, ONE_WAD);
+        utilizationRateInEther = getUtilizationRateInEther(0, 100 * 1e6);
+        assertEq(utilizationRateInEther, 1 ether);
 
-        // Test overflow
-        (invalid, utilizationRateWad) = getUtilizationRateWad(
-            ((2**256) - 1),
-            ((2**256) - 1)
+        // Test with very large number
+        utilizationRateInEther = getUtilizationRateInEther(
+            100 * 1e12 * 1e6, // 100 trillion USDT
+            100 * 1e12 * 1e6 // 100 trillion USDT
         );
-        assertTrue(invalid);
+        assertEq(utilizationRateInEther, 0.5 ether);
     }
 
     /// @notice Make sure the borrow rate calculation is correct
