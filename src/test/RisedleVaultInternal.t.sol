@@ -66,6 +66,9 @@ contract RisedleVaultInternalTest is
         assertEq(vaultTokenMetadata.name(), vaultTokenName);
         assertEq(vaultTokenMetadata.symbol(), vaultTokenSymbol);
         assertEq(vaultTokenMetadata.decimals(), 8);
+
+        // Make sure the total supply is set to zero
+        assertEq(getVaultTokenTotalSupply(), 0);
     }
 
     /// @notice Make sure getTotalAvailable return correctly
@@ -318,5 +321,50 @@ contract RisedleVaultInternalTest is
         // Make sure the totalBorrowed and totalCollectedFees are updated
         assertEq(totalBorrowed, 15024657534); // 400 + (90% of interest amount)
         assertEq(totalCollectedFees, 22739726); // 20 + (10% of interest amount)
+    }
+
+    /// @notice Make sure the getExchangeRateWad() working perfectly
+    function test_GetExchangeRateWad() public {
+        bool invalid;
+        uint256 exchangeRateWad;
+
+        // Scenario 1: Initial exchange rate
+        // totalSupply = 0
+        // exchangeRate should be 1:1
+        (invalid, exchangeRateWad) = getExchangeRateWad();
+        assertFalse(invalid);
+        assertEq(exchangeRateWad, ONE_WAD);
+
+        // Scenario 2: Simulate lender already supply some asset but the
+        // interest is not accrued yet
+        uint256 suppliedUSDT = 100 * 1e6; // 100 USDT
+        hevm.setUSDTBalance(address(this), suppliedUSDT); // Set contract balance to 100USDT
+
+        totalBorrowed = 0;
+        totalCollectedFees = 0;
+
+        // Mint to random address with 1:1 exchange rate
+        address supplier = hevm.addr(1);
+        _mint(supplier, 100 * 1e6); // Even though the decimals of rvToken is 8
+
+        // Make sure the exchange rate is correct
+        (invalid, exchangeRateWad) = getExchangeRateWad();
+        assertFalse(invalid);
+        assertEq(exchangeRateWad, ONE_WAD);
+
+        // Scenario 3: Simulate that the totalBorrowed is 50 USDT and interest
+        // already accrued 10 USDT.
+        // 1. Someone borrow the asset 50 USDT
+        hevm.setUSDTBalance(address(this), suppliedUSDT - (50 * 1e6)); // Set contract balance to 50USDT previously 100USDT
+        totalBorrowed = (50 * 1e6);
+
+        // 2. Interest accrued 10 USDT
+        totalBorrowed = totalBorrowed + (9 * 1e6); // 9 USDT (90% of interest accrued)
+        totalCollectedFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
+
+        // 3. Exchange rate should ~1.08
+        (invalid, exchangeRateWad) = getExchangeRateWad();
+        assertFalse(invalid);
+        assertEq(exchangeRateWad, 1080000000000000000); // 1.08
     }
 }
