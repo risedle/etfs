@@ -69,16 +69,6 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
 
-    /// @notice Event emitted when the interest amount is invalid
-    event InterestAmountInvalid(
-        uint256 totalBorrowed,
-        uint256 borrowRatePerSecondInEther,
-        uint256 elapsedSeconds
-    );
-
-    /// @notice Event emitted when the vault states invalid
-    event UpdateVaultStateFailed(uint256 interestAmount);
-
     /// @notice Event emitted when the interest succesfully accrued
     event InterestAccrued(
         uint256 previousTimestamp,
@@ -300,9 +290,9 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /**
      * @notice accrueInterest accrues interest to totalBorrowed and totalCollectedFees
      * @dev This calculates interest accrued from the last checkpointed timestamp
-     *      up to the current timestamp and writes new checkpoint to storage.
+     *      up to the current timestamp and update the totalBorrowed and totalCollectedFees
      */
-    function accrueInterest() public returns (bool invalid) {
+    function accrueInterest() public returns {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
         uint256 currentTimestamp = block.timestamp;
         uint256 previousTimestamp = lastTimestampInterestAccrued;
@@ -357,8 +347,6 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
             totalBorrowed,
             totalCollectedFees
         );
-        // Set invalid as false
-        return false;
     }
 
     /// @notice getVaultTokenSupply returns the total supply of the vault token
