@@ -44,19 +44,19 @@ contract RisedleVaultInternalTest is
         assertEq(totalCollectedFees, 0);
 
         // Make sure optimal utilization rate is set to 90%
-        assertEq(OPTIMAL_UTILIZATION_RATE_WAD, 900000000000000000);
+        assertEq(OPTIMAL_UTILIZATION_RATE_IN_ETHER, 900000000000000000);
 
         // Make sure the interest rate slop 1 is set to 20%
-        assertEq(INTEREST_SLOPE_1_WAD, 200000000000000000);
+        assertEq(INTEREST_SLOPE_1_IN_ETHER, 200000000000000000);
 
         // Make sure the interest rate slop 2 is set to 60%
-        assertEq(INTEREST_SLOPE_2_WAD, 600000000000000000);
+        assertEq(INTEREST_SLOPE_2_IN_ETHER, 600000000000000000);
 
         // Make sure the seconds per year is set
-        assertEq(SECONDS_PER_YEAR_WAD, 31536000000000000000000000);
+        assertEq(TOTAL_SECONDS_IN_A_YEAR, 31536000);
 
         // Make sure max borrow rate is set
-        assertEq(MAX_BORROW_RATE_PER_SECOND_WAD, 50735667174); // Approx 393% APY
+        assertEq(MAX_BORROW_RATE_PER_SECOND_IN_ETHER, 50735667174); // Approx 393% APY
 
         // Make sure one wad correctly set
         assertEq(ONE_WAD, 1e18);
@@ -142,59 +142,52 @@ contract RisedleVaultInternalTest is
     }
 
     /// @notice Make sure the borrow rate calculation is correct
-    function test_GetBorrowRatePerSecond() public {
+    function test_GetBorrowRatePerSecondInEther() public {
         // Set the model parameters
-        OPTIMAL_UTILIZATION_RATE_WAD = 900000000000000000; // 90% utilization
-        INTEREST_SLOPE_1_WAD = 200000000000000000; // 20% slope 1
-        INTEREST_SLOPE_2_WAD = 600000000000000000; // 60% slope 2
-
-        bool invalid;
-        uint256 borrowRatePerSecondWad;
+        OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
+        INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
+        INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
+        uint256 borrowRatePerSecondInEther;
 
         // Initial state: 0 utilization
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(0); // 0%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, 0);
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0);
+        assertEq(borrowRatePerSecondInEther, 0);
 
         // 0.5 utilization rate (50%)
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            500000000000000000
-        ); // 50%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, 3523310220); // approx 11.75% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.5 ether);
+        assertEq(borrowRatePerSecondInEther, 3523310220); // approx 11.75% APY
 
         // 0.94 utilization rate (94%)
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            940000000000000000
-        ); // 50%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, 19025875190); // approx 82.122% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.94 ether);
+        assertEq(borrowRatePerSecondInEther, 19025875190); // approx 82.122% APY
 
         // 0.97 utilization rate (97%)
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            970000000000000000
-        ); // 97%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.97 ether);
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
 
         // 0.99 utilization rate (99%)
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            990000000000000000
-        ); // 99%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.99 ether);
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
 
         // 1.0 utilization rate (100%)
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(ONE_WAD); // 100%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(1 ether); // 100%
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
 
         // More than 100% utilization rate should be capped to max borrow rate
-        (invalid, borrowRatePerSecondWad) = getBorrowRatePerSecondWad(
-            1086956521739130000
-        ); // 108%
-        assertFalse(invalid);
-        assertEq(borrowRatePerSecondWad, MAX_BORROW_RATE_PER_SECOND_WAD); // approx 393% APY
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(1.5 ether); // 150%
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
     }
 
     /// @notice Make sure getInterestAmount is correct
