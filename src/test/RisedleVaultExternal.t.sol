@@ -35,13 +35,18 @@ contract Lender {
     function lend(uint256 amount) public {
         // approve vault to spend the underlying asset
         underlying.safeApprove(address(_vault), type(uint256).max);
-        // address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        // IERC20 USDT = IERC20(usdtAddress);
-        // USDT.approve(address(_vault), amount);
-        // USDT.approve(address(_vault), uint256((2**256) - 1));
 
         // Supply asset
         _vault.mint(amount);
+    }
+
+    /// @notice lender remove asset
+    function withdraw(uint256 amount) public {
+        // approve vault to spend the vault token
+        _vault.approve(address(_vault), type(uint256).max);
+
+        // Withdraw asset
+        _vault.burn(amount);
     }
 }
 
@@ -91,7 +96,7 @@ contract RisedleVaultExternalTest is DSTest {
     }
 
     /// @notice Make sure the lender can supply asset to the vault
-    function test_LenderCanSupplyAssetToTheVault() public {
+    function test_LenderCanAddSupplytToTheVault() public {
         // Create new vault
         rvUSDTAdmin = address(this); // Set this contract as admin
         address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
@@ -121,5 +126,42 @@ contract RisedleVaultExternalTest is DSTest {
 
         // The vault should receive the USDT
         assertEq(USDT.balanceOf(address(vault)), amount);
+    }
+
+    /// @notice Make sure the lender can remove asset from the vault
+    function test_LenderCanRemoveSupplyFromTheVault() public {
+        // Create new vault
+        rvUSDTAdmin = address(this); // Set this contract as admin
+        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+        IERC20 USDT = IERC20(usdtAddress);
+        RisedleVault vault = new RisedleVault(
+            "Risedle USDT Vault",
+            "rvUSDT",
+            usdtAddress,
+            rvUSDTAdmin
+        );
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDT balance
+        uint256 amount = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(lender), amount);
+        uint256 lenderBalance = USDT.balanceOf(address(lender));
+        assertEq(amount, lenderBalance);
+
+        // Lender add supply to the vault
+        lender.lend(amount);
+        assertEq(USDT.balanceOf(address(vault)), amount);
+
+        // Lender remove supply from the vault
+        lender.withdraw(amount);
+
+        // Lender vault token should be burned
+        uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
+        assertEq(lenderVaultTokenBalance, 0);
+
+        // The lender should receive the USDT back
+        assertEq(USDT.balanceOf(address(lender)), amount);
     }
 }
