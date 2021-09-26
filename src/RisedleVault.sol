@@ -421,4 +421,46 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         // Set invalid as false
         return false;
     }
+
+    /// @notice getVaultTokenSupply returns the total supply of rvToken
+    function getVaultTokenTotalSupply() internal view returns (uint256) {
+        IERC20 vaultToken = IERC20(address(this));
+        return vaultToken.totalSupply();
+    }
+
+    /**
+     * @notice Calculates the exchange rate from the underlying to the rvToken
+     * @return invalid True if overflow or underflow happen
+     * @return exchangeRateWad The exchange rate stored as wad.
+     *         exchangeRateWad=0 if invalid=true
+     */
+    function getExchangeRateWad()
+        internal
+        view
+        returns (bool invalid, uint256 exchangeRateWad)
+    {
+        uint256 totalSupply = getVaultTokenTotalSupply();
+
+        if (totalSupply == 0) {
+            // If there is no supply, exchange rate is 1:1
+            return (false, ONE_WAD);
+        } else {
+            // Otherwise: exchangeRate = (totalAvailable + totalBorrowed) / totalSupply
+            uint256 totalAvailable = getTotalAvailable();
+            uint256 totalAllUnderlyingAssetAmount;
+            (invalid, totalAllUnderlyingAssetAmount) = madd(
+                totalAvailable,
+                totalBorrowed
+            );
+            if (invalid) return (invalid, 0);
+            (invalid, exchangeRateWad) = mwdiv(
+                totalAllUnderlyingAssetAmount,
+                totalSupply
+            );
+            if (invalid) return (invalid, 0);
+            // Return exchange rate wad
+            return (false, exchangeRateWad);
+        }
+    }
+
 }
