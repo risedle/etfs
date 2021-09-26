@@ -65,7 +65,7 @@ contract RisedleVaultInternalTest is
         IERC20Metadata vaultTokenMetadata = IERC20Metadata(address(this));
         assertEq(vaultTokenMetadata.name(), vaultTokenName);
         assertEq(vaultTokenMetadata.symbol(), vaultTokenSymbol);
-        assertEq(vaultTokenMetadata.decimals(), 8);
+        assertEq(vaultTokenMetadata.decimals(), 18); // Default decimals
 
         // Make sure the total supply is set to zero
         assertEq(getVaultTokenTotalSupply(), 0);
@@ -325,14 +325,12 @@ contract RisedleVaultInternalTest is
 
     /// @notice Make sure the getExchangeRateWad() working perfectly
     function test_GetExchangeRateWad() public {
-        bool invalid;
         uint256 exchangeRateWad;
 
         // Scenario 1: Initial exchange rate
         // totalSupply = 0
         // exchangeRate should be 1:1
-        (invalid, exchangeRateWad) = getExchangeRateWad();
-        assertFalse(invalid);
+        exchangeRateWad = getExchangeRateWad();
         assertEq(exchangeRateWad, ONE_WAD);
 
         // Scenario 2: Simulate lender already supply some asset but the
@@ -348,8 +346,7 @@ contract RisedleVaultInternalTest is
         _mint(supplier, 100 * 1e6); // Even though the decimals of rvToken is 8
 
         // Make sure the exchange rate is correct
-        (invalid, exchangeRateWad) = getExchangeRateWad();
-        assertFalse(invalid);
+        exchangeRateWad = getExchangeRateWad();
         assertEq(exchangeRateWad, ONE_WAD);
 
         // Scenario 3: Simulate that the totalBorrowed is 50 USDT and interest
@@ -363,8 +360,7 @@ contract RisedleVaultInternalTest is
         totalCollectedFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
 
         // 3. Exchange rate should ~1.08
-        (invalid, exchangeRateWad) = getExchangeRateWad();
-        assertFalse(invalid);
+        exchangeRateWad = getExchangeRateWad();
         assertEq(exchangeRateWad, 1080000000000000000); // 1.08
     }
 }
