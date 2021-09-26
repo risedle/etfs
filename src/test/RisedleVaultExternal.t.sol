@@ -15,7 +15,15 @@ import {RisedleVault} from "../RisedleVault.sol";
 
 /// @notice Dummy contract to simulate the borrower
 contract Borrower {
+    RisedleVault private _vault;
 
+    constructor(RisedleVault vault) {
+        _vault = vault;
+    }
+
+    function borrow(uint256 amount) public {
+        _vault.borrow(amount);
+    }
 }
 
 /// @notice Dummy contract to simulate the lender
@@ -83,7 +91,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure admin can grant borrower role
     function test_AdminCanGrantBorrower() public {
         // Create new borrower actor
-        Borrower borrower = new Borrower();
+        Borrower borrower = new Borrower(rvUSDT);
 
         // Grant borrower
         rvUSDT.grantAsBorrower(address(borrower));
@@ -163,5 +171,65 @@ contract RisedleVaultExternalTest is DSTest {
 
         // The lender should receive the USDT back
         assertEq(USDT.balanceOf(address(lender)), amount);
+    }
+
+    /// @notice Make sure unauthorized borrower cannot borrow
+    function testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() public {
+        // Create new vault
+        rvUSDTAdmin = address(this); // Set this contract as admin
+        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+        RisedleVault vault = new RisedleVault(
+            "Risedle USDT Vault",
+            "rvUSDT",
+            usdtAddress,
+            rvUSDTAdmin
+        );
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
+        lender.lend(1000 * 1e6); // 1000 USDT
+
+        // Unauthorized borrower borrow from the vault
+        Borrower unauthorizedBorrower = new Borrower(vault);
+        unauthorizedBorrower.borrow(100 * 1e6); // 100 USDT
+    }
+
+    /// @notice Make sure authorized borrower can borrow
+    function test_AuthorizedBorrowerCanBorrowFromTheVault() public {
+        // Create new vault
+        rvUSDTAdmin = address(this); // Set this contract as admin
+        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+        IERC20 USDT = IERC20(usdtAddress);
+        RisedleVault vault = new RisedleVault(
+            "Risedle USDT Vault",
+            "rvUSDT",
+            usdtAddress,
+            rvUSDTAdmin
+        );
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
+        lender.lend(1000 * 1e6); // 1000 USDT
+
+        // Authorized borrower borrow from the vault
+        Borrower authorizedBorrower = new Borrower(vault);
+        vault.grantAsBorrower(address(authorizedBorrower));
+
+        // Borrow underlying asset
+        uint256 borrowAmount = 100 * 1e6;
+        authorizedBorrower.borrow(borrowAmount); // 100 USDT
+
+        // Make sure the vault states are updated
+        assertEq(vault.totalOutstandingDebt(), borrowAmount);
+        assertEq(vault.totalPrincipalBorrowed(), borrowAmount);
+        assertEq(
+            vault.getOutstandingDebt(address(authorizedBorrower)),
+            borrowAmount
+        );
+
+        // Make sure the underlying asset is transfered to the borrower
+        assertEq(USDT.balanceOf(address(authorizedBorrower)), borrowAmount);
     }
 }
