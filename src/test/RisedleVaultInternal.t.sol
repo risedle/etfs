@@ -58,9 +58,6 @@ contract RisedleVaultInternalTest is
         // Make sure max borrow rate is set
         assertEq(MAX_BORROW_RATE_PER_SECOND_IN_ETHER, 50735667174); // Approx 393% APY
 
-        // Make sure one wad correctly set
-        assertEq(ONE_WAD, 1e18);
-
         // Make sure the Vault's token properties is correct
         IERC20Metadata vaultTokenMetadata = IERC20Metadata(address(this));
         assertEq(vaultTokenMetadata.name(), vaultTokenName);
@@ -266,15 +263,12 @@ contract RisedleVaultInternalTest is
 
     /// @notice Make sure accrue interest is working perfectly
     function test_AccrueInterest() public {
-        bool invalid;
-
         // Scenario 1: 0% utilization
         totalBorrowed = 0;
         totalCollectedFees = 0;
         uint256 contractBalance = 1000 * 1e6; // 1000 USDT
         hevm.setUSDTBalance(address(this), contractBalance); // Set the contract balance
-        invalid = accrueInterest();
-        assertFalse(invalid);
+        accrueInterest();
         // Make sure it doesn't change the totalBorrowed and totalCollectedFees
         assertEq(totalBorrowed, 0);
         assertEq(totalCollectedFees, 0);
@@ -287,8 +281,7 @@ contract RisedleVaultInternalTest is
         // Set block timestamp to 24 hours later
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 24));
         // Perform interest calculation
-        invalid = accrueInterest();
-        assertFalse(invalid);
+        accrueInterest();
         // Make sure the totalBorrowed and totalCollectedFees are updated
         assertEq(totalBorrowed, 100042149); // 100 + (90% of interest amount)
         assertEq(totalCollectedFees, 20004683); // 20 + (10% of interest amount)
@@ -301,8 +294,7 @@ contract RisedleVaultInternalTest is
         // Set block timestamp to 3 hours later
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 3));
         // Perform interest calculation
-        invalid = accrueInterest();
-        assertFalse(invalid);
+        accrueInterest();
         // Make sure the totalBorrowed and totalCollectedFees are updated
         assertEq(totalBorrowed, 400056712); // 400 + (90% of interest amount)
         assertEq(totalCollectedFees, 20006301); // 20 + (10% of interest amount)
@@ -315,22 +307,21 @@ contract RisedleVaultInternalTest is
         // Set block timestamp to 10 hours later
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 10));
         // Perform interest calculation
-        invalid = accrueInterest();
-        assertFalse(invalid);
+        accrueInterest();
         // Make sure the totalBorrowed and totalCollectedFees are updated
         assertEq(totalBorrowed, 15024657534); // 400 + (90% of interest amount)
         assertEq(totalCollectedFees, 22739726); // 20 + (10% of interest amount)
     }
 
-    /// @notice Make sure the getExchangeRateWad() working perfectly
-    function test_GetExchangeRateWad() public {
-        uint256 exchangeRateWad;
+    /// @notice Make sure the getExchangeRateInEther() working perfectly
+    function test_GetExchangeRateInEther() public {
+        uint256 exchangeRateInETher;
 
         // Scenario 1: Initial exchange rate
         // totalSupply = 0
         // exchangeRate should be 1:1
-        exchangeRateWad = getExchangeRateWad();
-        assertEq(exchangeRateWad, ONE_WAD);
+        exchangeRateInETher = getExchangeRateInEther();
+        assertEq(exchangeRateInETher, 1 ether);
 
         // Scenario 2: Simulate lender already supply some asset but the
         // interest is not accrued yet
@@ -342,11 +333,11 @@ contract RisedleVaultInternalTest is
 
         // Mint to random address with 1:1 exchange rate
         address supplier = hevm.addr(1);
-        _mint(supplier, 100 * 1e6); // Even though the decimals of rvToken is 8
+        _mint(supplier, 100 * 1e6);
 
         // Make sure the exchange rate is correct
-        exchangeRateWad = getExchangeRateWad();
-        assertEq(exchangeRateWad, ONE_WAD);
+        exchangeRateInETher = getExchangeRateInEther();
+        assertEq(exchangeRateInETher, 1 ether);
 
         // Scenario 3: Simulate that the totalBorrowed is 50 USDT and interest
         // already accrued 10 USDT.
@@ -359,7 +350,18 @@ contract RisedleVaultInternalTest is
         totalCollectedFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
 
         // 3. Exchange rate should ~1.08
-        exchangeRateWad = getExchangeRateWad();
-        assertEq(exchangeRateWad, 1080000000000000000); // 1.08
+        exchangeRateInETher = getExchangeRateInEther();
+        assertEq(exchangeRateInETher, 1.08 ether); // 1.08
+
+        // Test with very large numbers
+        // Update the total supply first
+        _burn(supplier, (100 * 1e6));
+        _mint(supplier, (100 * 1e12 * 1e6));
+        hevm.setUSDTBalance(address(this), (50 * 1e12 * 1e6)); // Set contract balance to 50 trillion USDT
+        totalBorrowed = (50 * 1e12 * 1e6); // 50 trillion USDT
+        totalBorrowed = totalBorrowed + (9 * 1e12 * 1e6); // 9 trillion USDT (90% of interest accrued)
+        totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)
+        exchangeRateInETher = getExchangeRateInEther();
+        assertEq(exchangeRateInETher, 1.08 ether); // 1.08
     }
 }

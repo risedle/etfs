@@ -48,17 +48,14 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /// @notice Optimal utilization rate in ether units
     uint256 public OPTIMAL_UTILIZATION_RATE_IN_ETHER;
 
-    /// @notice Interest slope 1, stored in wad
+    /// @notice Interest slope 1 in ether units
     uint256 public INTEREST_SLOPE_1_IN_ETHER;
 
-    /// @notice Interest slop 2, stored in wad
+    /// @notice Interest slop 2 in ether units
     uint256 public INTEREST_SLOPE_2_IN_ETHER;
 
     /// @notice Number of seconds in a year (approximation)
     uint256 public immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
-
-    /// @notice 1.0 stored as wad, 1e18 precision
-    uint256 public immutable ONE_WAD = 1000000000000000000;
 
     /// @notice Maximum borrow rate per second in ether units
     uint256 public immutable MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
@@ -88,7 +85,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     event SupplyAdded(
         address indexed account,
         uint256 amount,
-        uint256 exchangeRateWad,
+        uint256 ExchangeRateInEther,
         uint256 mintedAmount
     );
 
@@ -292,13 +289,13 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
      * @dev This calculates interest accrued from the last checkpointed timestamp
      *      up to the current timestamp and update the totalBorrowed and totalCollectedFees
      */
-    function accrueInterest() public returns {
+    function accrueInterest() public {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
         uint256 currentTimestamp = block.timestamp;
         uint256 previousTimestamp = lastTimestampInterestAccrued;
 
         // If currentTimestamp and previousTimestamp is similar then return early
-        if (currentTimestamp == previousTimestamp) return false;
+        if (currentTimestamp == previousTimestamp) return;
 
         // For logging purpose
         uint256 previousTotalBorrowed = totalBorrowed;
@@ -356,46 +353,37 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     }
 
     /**
-     * @notice getExchangeRateWad get the current exchange rate from the
-     *         underlying asset to the token vault.
-     *         The transaction will revert if there is overflow/underflow.
-     * @return exchangeRateWad The exchange rate stored as wad.
-     *         exchangeRateWad=0 if invalid=true
+     * @notice getExchangeRateInEther get the current exchange rate of vault token
+     *         in term of underlying asset.
+     * @return The exchange rates in ether units
      */
-    function getExchangeRateWad()
-        internal
-        view
-        returns (uint256 exchangeRateWad)
-    {
+    function getExchangeRateInEther() internal view returns (uint256) {
         uint256 totalSupply = getVaultTokenTotalSupply();
 
         if (totalSupply == 0) {
             // If there is no supply, exchange rate is 1:1
-            return ONE_WAD;
+            return 1 ether;
         } else {
             // Otherwise: exchangeRate = (totalAvailable + totalBorrowed) / totalSupply
             uint256 totalAvailable = getTotalAvailableCash();
-            uint256 totalAllUnderlyingAssetAmount = add(
-                totalAvailable,
-                totalBorrowed
-            );
-            exchangeRateWad = wdiv(totalAllUnderlyingAssetAmount, totalSupply);
-            return exchangeRateWad;
+            uint256 totalAllUnderlyingAsset = totalAvailable + totalBorrowed;
+            uint256 exchangeRateInEther = (totalAllUnderlyingAsset * 1 ether) /
+                totalSupply;
+            return exchangeRateInEther;
         }
     }
 
     /**
-     * @notice getCurrentExchangeRateWad returns the up-to-date exchange rate
-     * @return Exchange rate represented as wad
+     * @notice getCurrentExchangeRateInEther returns the up-to-date exchange rate
+     * @return Exchange rate in ether units
      */
-    function getCurrentExchangeRateWad()
+    function getCurrentExchangeRateInEther()
         external
         nonReentrant
         returns (uint256)
     {
-        bool invalid = accrueInterest();
-        require(invalid == false, "FAILED_TO_ACCRUE_INTEREST");
-        return getExchangeRateWad();
+        accrueInterest();
+        return getExchangeRateInEther();
     }
 
     /**
@@ -410,21 +398,19 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         accrueInterest();
 
         // Get the exchange rate
-        uint256 exchangeRateWad = getExchangeRateWad();
+        uint256 exchangeRateInEther = getExchangeRateInEther();
 
         // Transfer underlying asset from lender to contract
         IERC20 underlyingToken = IERC20(underlying);
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate how much vault token we need to send to the lender
-        uint256 amountWad = mul(amount, ONE_WAD);
-        uint256 mintedAmountWad = wdiv(amountWad, exchangeRateWad);
-        uint256 mintedAmount = mintedAmountWad / ONE_WAD; // Scale down again
+        uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther;
 
         // Send vault token to the lender
         _mint(msg.sender, mintedAmount); // rvToken is 18 decimals
 
         // Emit event
-        emit SupplyAdded(msg.sender, amount, exchangeRateWad, mintedAmount);
+        emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
     }
 }
