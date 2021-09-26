@@ -19,10 +19,11 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {DSMath} from "lib/meth/src/math.sol";
 
 /// @title Risedle's Vault
-contract RisedleVault is ERC20, AccessControl, DSMath {
+contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice Only valid borrower can borrow and repay underlying assets
@@ -102,6 +103,14 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         uint256 totalCollectedFees
     );
 
+    /// @notice Event emitted when lender add supply to the vault
+    event SupplyAdded(
+        address indexed account,
+        uint256 amount,
+        uint256 exchangeRateWad,
+        uint256 mintedAmountWad
+    );
+
     /**
      * @notice Contruct new vault
      * @param name The vault's token name
@@ -130,14 +139,6 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         OPTIMAL_UTILIZATION_RATE_WAD = 900000000000000000; // 90% utilization
         INTEREST_SLOPE_1_WAD = 200000000000000000; // 20% slope 1
         INTEREST_SLOPE_2_WAD = 600000000000000000; // 60% slope 2
-    }
-
-    /**
-     * @notice Similar to cToken decimals
-     * @dev https://docs.openzeppelin.com/contracts/4.x/erc20#a-note-on-decimals
-     */
-    function decimals() public view virtual override returns (uint8) {
-        return 8;
     }
 
     /**
@@ -422,7 +423,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         return false;
     }
 
-    /// @notice getVaultTokenSupply returns the total supply of rvToken
+    /// @notice getVaultTokenSupply returns the total supply of the vault token
     function getVaultTokenTotalSupply() internal view returns (uint256) {
         IERC20 vaultToken = IERC20(address(this));
         return vaultToken.totalSupply();
@@ -431,37 +432,71 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     /**
      * @notice getExchangeRateWad get the current exchange rate from the
      *         underlying asset to the token vault.
-     * @return invalid True if overflow or underflow happen
+     *         The transaction will revert if there is overflow/underflow.
      * @return exchangeRateWad The exchange rate stored as wad.
      *         exchangeRateWad=0 if invalid=true
      */
     function getExchangeRateWad()
         internal
         view
-        returns (bool invalid, uint256 exchangeRateWad)
+        returns (uint256 exchangeRateWad)
     {
         uint256 totalSupply = getVaultTokenTotalSupply();
 
         if (totalSupply == 0) {
             // If there is no supply, exchange rate is 1:1
-            return (false, ONE_WAD);
+            return ONE_WAD;
         } else {
             // Otherwise: exchangeRate = (totalAvailable + totalBorrowed) / totalSupply
             uint256 totalAvailable = getTotalAvailable();
-            uint256 totalAllUnderlyingAssetAmount;
-            (invalid, totalAllUnderlyingAssetAmount) = madd(
+            uint256 totalAllUnderlyingAssetAmount = add(
                 totalAvailable,
                 totalBorrowed
             );
-            if (invalid) return (invalid, 0);
-            (invalid, exchangeRateWad) = mwdiv(
-                totalAllUnderlyingAssetAmount,
-                totalSupply
-            );
-            if (invalid) return (invalid, 0);
-            // Return exchange rate wad
-            return (false, exchangeRateWad);
+            exchangeRateWad = wdiv(totalAllUnderlyingAssetAmount, totalSupply);
+            return exchangeRateWad;
         }
     }
 
+    /**
+     * @notice getCurrentExchangeRateWad returns the up-to-date exchange rate
+     * @return Exchange rate represented as wad
+     */
+    function getCurrentExchangeRateWad()
+        external
+        nonReentrant
+        returns (uint256)
+    {
+        bool invalid = accrueInterest();
+        require(invalid == false, "FAILED_TO_ACCRUE_INTEREST");
+        return getExchangeRateWad();
+    }
+
+    /**
+     * @notice Lender supplies underlying assets into the vault and receives
+     *         rvTokens in exchange
+     * @dev Accrues interest whether or not the operation succeeds, emit
+     *      error events if failed
+     * @param amount The amount of the underlying asset to supply
+     */
+    function mint(uint256 amount) external nonReentrant {
+        // Accrue interest, emit events if something bad happen
+        accrueInterest();
+
+        // Get the exchange rate
+        uint256 exchangeRateWad = getExchangeRateWad();
+
+        // Transfer underlying asset from lender to contract
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        // Calculate how much vault token we need to send to the lender
+        uint256 mintedAmountWad = wdiv(amount, exchangeRateWad);
+
+        // Send vault token to the lender
+        _mint(msg.sender, mintedAmountWad); // rvToken is 18 decimals
+
+        // Emit event
+        emit SupplyAdded(msg.sender, amount, exchangeRateWad, mintedAmountWad);
+    }
 }
