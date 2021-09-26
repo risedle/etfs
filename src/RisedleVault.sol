@@ -88,6 +88,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 mintedAmount
     );
 
+    /// @notice Event emitted when lender remove supply from the vault
+    event SupplyRemoved(
+        address indexed account,
+        uint256 amount,
+        uint256 ExchangeRateInEther,
+        uint256 redeemedAmount
+    );
+
     /**
      * @notice Contruct new vault
      * @param name The vault's token name
@@ -387,9 +395,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice Lender supplies underlying assets into the vault and receives
-     *         rvTokens in exchange
-     * @dev Accrues interest whether or not the operation succeeds, emit
-     *      error events if failed
+     *         vault tokens in exchange
      * @param amount The amount of the underlying asset to supply
      */
     function mint(uint256 amount) external nonReentrant {
@@ -399,7 +405,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Get the exchange rate
         uint256 exchangeRateInEther = getExchangeRateInEther();
 
-        // Transfer underlying asset from lender to contract
+        // Transfer underlying asset from lender to the vault
         IERC20 underlyingToken = IERC20(underlying);
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -411,5 +417,35 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
         // Emit event
         emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
+    }
+
+    /**
+     * @notice Lender burn vault tokens and receives underlying tokens in exchange
+     * @param amount The amount of the vault tokens
+     */
+    function burn(uint256 amount) external nonReentrant {
+        // Accrue interest
+        accrueInterest();
+
+        // Get the exchange rate
+        uint256 exchangeRateInEther = getExchangeRateInEther();
+
+        // Burn the vault tokens from the lender
+        _burn(msg.sender, amount);
+
+        // Calculate how much underlying token we need to send to the lender
+        uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether;
+
+        // Transfer underlying asset from the vault to the lender
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.safeTransfer(msg.sender, redeemedAmount);
+
+        // Emit event
+        emit SupplyRemoved(
+            msg.sender,
+            amount,
+            exchangeRateInEther,
+            redeemedAmount
+        );
     }
 }
