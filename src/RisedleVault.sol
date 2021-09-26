@@ -339,7 +339,6 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
         uint256 currentTimestamp = block.timestamp;
         uint256 previousTimestamp = lastTimestampInterestAccrued;
-        lastTimestampInterestAccrued = currentTimestamp;
 
         // If currentTimestamp and previousTimestamp is similar then return early
         if (currentTimestamp == previousTimestamp) return false;
@@ -404,7 +403,8 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
             return invalid;
         }
 
-        // Otherwise emit event
+        // Otherwise set the timestamp last accrued and emit event
+        lastTimestampInterestAccrued = currentTimestamp;
         emit InterestAccrued(
             previousTimestamp,
             currentTimestamp,
