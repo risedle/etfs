@@ -37,8 +37,8 @@ contract RisedleVaultInternalTest is
         // Make sure admin address is correct
         assertEq(admin, rvUSDTAdmin);
 
-        // Make sure total borrowed is zero
-        assertEq(totalBorrowed, 0);
+        // Make sure total outstanding debt is zero
+        assertEq(totalOutstandingDebt, 0);
 
         // Make sure total collected fees is zero
         assertEq(totalCollectedFees, 0);
@@ -104,29 +104,29 @@ contract RisedleVaultInternalTest is
     function test_GetUtilizationRateInEther() public {
         uint256 utilizationRateInEther;
 
-        // Available=0 ; Borrowed=0
+        // Available=0 ; Outstanding debt=0
         utilizationRateInEther = getUtilizationRateInEther(0, 0);
         assertEq(utilizationRateInEther, 0);
 
-        // Available=100 USDT; Borrowed=0
+        // Available=100 USDT; Outstanding debt=0
         utilizationRateInEther = getUtilizationRateInEther(100 * 1e6, 0);
         assertEq(utilizationRateInEther, 0);
 
-        // Available=100 USDT; Borrowed=50 USDT
+        // Available=100 USDT; Outstanding debt=50 USDT
         utilizationRateInEther = getUtilizationRateInEther(
             100 * 1e6, // 100 USDT
             50 * 1e6 // 50 USDT
         );
         assertEq(utilizationRateInEther, 333333333333333333); // 0.33 Utilization rate
 
-        // Available=50 USDT; Borrowed=100 USDT
+        // Available=50 USDT; Outstanding debt=100 USDT
         utilizationRateInEther = getUtilizationRateInEther(
             50 * 1e6, // 50 USDT
             100 * 1e6 // 100 USDT
         );
         assertEq(utilizationRateInEther, 666666666666666666); // 0.66 Utilization rate
 
-        // Available=0; Borrowed=100 USDT
+        // Available=0; Outstanding debt=100 USDT
         utilizationRateInEther = getUtilizationRateInEther(0, 100 * 1e6);
         assertEq(utilizationRateInEther, 1 ether);
 
@@ -191,14 +191,14 @@ contract RisedleVaultInternalTest is
     function test_GetInterestAmount() public {
         uint256 interestAmount;
 
-        // Total Borrowed: 0
+        // Total Outstanding debt: 0
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: 0
         // Expected interest amount: 0
         interestAmount = getInterestAmount(0, 0, 0);
         assertEq(interestAmount, 0);
 
-        // Total Borrowed: x
+        // Total Outstanding debt: x
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: 0
         // Expected interest amount: 0
@@ -209,14 +209,14 @@ contract RisedleVaultInternalTest is
         );
         assertEq(interestAmount, 0);
 
-        // Total Borrowed: 0
+        // Total Outstanding debt: 0
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: y
         // Expected interest amount: 0
         interestAmount = getInterestAmount(0, 0, 20);
         assertEq(interestAmount, 0);
 
-        // Total Borrowed: x
+        // Total Outstanding debt: x
         // Borrow Rate Per Seconds: y
         // Elapsed Seconds: z
         // Expected interest amount: 0
@@ -239,42 +239,42 @@ contract RisedleVaultInternalTest is
     /// @notice Make sure updateVaultStates update the vault states correctly
     function test_UpdateVaultStates() public {
         // interestAmount=0
-        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalCollectedFees = 5 * 1e6; // 5 USDT
         updateVaultStates(0);
-        assertEq(totalBorrowed, 100 * 1e6);
+        assertEq(totalOutstandingDebt, 100 * 1e6);
         assertEq(totalCollectedFees, 5 * 1e6);
 
         // interestAmount=10 USDT
-        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalCollectedFees = 5 * 1e6; // 5 USDT
         updateVaultStates(10 * 1e6); // 10 USDT
-        // The totalBorrowed & totalCollectedFees should be updated
-        assertEq(totalBorrowed, 109000000); // 109 USDT
+        // The totalOutstandingDebt & totalCollectedFees should be updated
+        assertEq(totalOutstandingDebt, 109000000); // 109 USDT
         assertEq(totalCollectedFees, 6000000); // 6 USDT
 
         // Test with very large numbers
-        totalBorrowed = 100 * 1e12 * 1e6; // 100 trillion USDT
+        totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
         totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT
         updateVaultStates(10 * 1e12 * 1e6); // 10 trillion USDT
-        assertEq(totalBorrowed, 109 * 1e12 * 1e6); // 109 trillion USDT
+        assertEq(totalOutstandingDebt, 109 * 1e12 * 1e6); // 109 trillion USDT
         assertEq(totalCollectedFees, 2 * 1e12 * 1e6); // 2 trillion USDT
     }
 
     /// @notice Make sure accrue interest is working perfectly
     function test_AccrueInterest() public {
         // Scenario 1: 0% utilization
-        totalBorrowed = 0;
+        totalOutstandingDebt = 0;
         totalCollectedFees = 0;
         uint256 contractBalance = 1000 * 1e6; // 1000 USDT
         hevm.setUSDTBalance(address(this), contractBalance); // Set the contract balance
         accrueInterest();
-        // Make sure it doesn't change the totalBorrowed and totalCollectedFees
-        assertEq(totalBorrowed, 0);
+        // Make sure it doesn't change the totalOutstandingDebt and totalCollectedFees
+        assertEq(totalOutstandingDebt, 0);
         assertEq(totalCollectedFees, 0);
 
         // Scenario 2: Below optimal utilization rate
-        totalBorrowed = 100 * 1e6; // 100 USDT
+        totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalCollectedFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
@@ -282,12 +282,12 @@ contract RisedleVaultInternalTest is
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 24));
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalBorrowed and totalCollectedFees are updated
-        assertEq(totalBorrowed, 100042149); // 100 + (90% of interest amount)
+        // Make sure the totalOutstandingDebt and totalCollectedFees are updated
+        assertEq(totalOutstandingDebt, 100042149); // 100 + (90% of interest amount)
         assertEq(totalCollectedFees, 20004683); // 20 + (10% of interest amount)
 
         // Scenario 3: Above optimzal utilization rate
-        totalBorrowed = 400 * 1e6; // 400 USDT
+        totalOutstandingDebt = 400 * 1e6; // 400 USDT
         totalCollectedFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
@@ -295,12 +295,12 @@ contract RisedleVaultInternalTest is
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 3));
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalBorrowed and totalCollectedFees are updated
-        assertEq(totalBorrowed, 400056712); // 400 + (90% of interest amount)
+        // Make sure the totalOutstandingDebt and totalCollectedFees are updated
+        assertEq(totalOutstandingDebt, 400056712); // 400 + (90% of interest amount)
         assertEq(totalCollectedFees, 20006301); // 20 + (10% of interest amount)
 
         // Scenario 4: Maximum utilization rate
-        totalBorrowed = 15000 * 1e6; // 15000 USDT
+        totalOutstandingDebt = 15000 * 1e6; // 15000 USDT
         totalCollectedFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
@@ -308,8 +308,8 @@ contract RisedleVaultInternalTest is
         hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 10));
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalBorrowed and totalCollectedFees are updated
-        assertEq(totalBorrowed, 15024657534); // 400 + (90% of interest amount)
+        // Make sure the totalOutstandingDebt and totalCollectedFees are updated
+        assertEq(totalOutstandingDebt, 15024657534); // 400 + (90% of interest amount)
         assertEq(totalCollectedFees, 22739726); // 20 + (10% of interest amount)
     }
 
@@ -328,7 +328,7 @@ contract RisedleVaultInternalTest is
         uint256 suppliedUSDT = 100 * 1e6; // 100 USDT
         hevm.setUSDTBalance(address(this), suppliedUSDT); // Set contract balance to 100USDT
 
-        totalBorrowed = 0;
+        totalOutstandingDebt = 0;
         totalCollectedFees = 0;
 
         // Mint to random address with 1:1 exchange rate
@@ -339,14 +339,14 @@ contract RisedleVaultInternalTest is
         exchangeRateInETher = getExchangeRateInEther();
         assertEq(exchangeRateInETher, 1 ether);
 
-        // Scenario 3: Simulate that the totalBorrowed is 50 USDT and interest
+        // Scenario 3: Simulate that the totalOutstandingDebt is 50 USDT and interest
         // already accrued 10 USDT.
         // 1. Someone borrow the asset 50 USDT
         hevm.setUSDTBalance(address(this), suppliedUSDT - (50 * 1e6)); // Set contract balance to 50USDT previously 100USDT
-        totalBorrowed = (50 * 1e6);
+        totalOutstandingDebt = (50 * 1e6);
 
         // 2. Interest accrued 10 USDT
-        totalBorrowed = totalBorrowed + (9 * 1e6); // 9 USDT (90% of interest accrued)
+        totalOutstandingDebt = totalOutstandingDebt + (9 * 1e6); // 9 USDT (90% of interest accrued)
         totalCollectedFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
 
         // 3. Exchange rate should ~1.08
@@ -358,8 +358,8 @@ contract RisedleVaultInternalTest is
         _burn(supplier, (100 * 1e6));
         _mint(supplier, (100 * 1e12 * 1e6));
         hevm.setUSDTBalance(address(this), (50 * 1e12 * 1e6)); // Set contract balance to 50 trillion USDT
-        totalBorrowed = (50 * 1e12 * 1e6); // 50 trillion USDT
-        totalBorrowed = totalBorrowed + (9 * 1e12 * 1e6); // 9 trillion USDT (90% of interest accrued)
+        totalOutstandingDebt = (50 * 1e12 * 1e6); // 50 trillion USDT
+        totalOutstandingDebt = totalOutstandingDebt + (9 * 1e12 * 1e6); // 9 trillion USDT (90% of interest accrued)
         totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)
         exchangeRateInETher = getExchangeRateInEther();
         assertEq(exchangeRateInETher, 1.08 ether); // 1.08
