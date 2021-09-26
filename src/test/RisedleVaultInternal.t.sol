@@ -192,48 +192,51 @@ contract RisedleVaultInternalTest is
 
     /// @notice Make sure getInterestAmount is correct
     function test_GetInterestAmount() public {
-        bool invalid;
         uint256 interestAmount;
 
         // Total Borrowed: 0
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: 0
         // Expected interest amount: 0
-        (invalid, interestAmount) = getInterestAmount(0, 0, 0);
-        assertFalse(invalid);
+        interestAmount = getInterestAmount(0, 0, 0);
         assertEq(interestAmount, 0);
 
         // Total Borrowed: x
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: 0
         // Expected interest amount: 0
-        (invalid, interestAmount) = getInterestAmount(
+        interestAmount = getInterestAmount(
             100 * 1e6, // 100 USDT
             0,
             0
         );
-        assertFalse(invalid);
         assertEq(interestAmount, 0);
 
         // Total Borrowed: 0
         // Borrow Rate Per Seconds: 0
         // Elapsed Seconds: y
         // Expected interest amount: 0
-        (invalid, interestAmount) = getInterestAmount(0, 0, 20);
-        assertFalse(invalid);
+        interestAmount = getInterestAmount(0, 0, 20);
         assertEq(interestAmount, 0);
 
         // Total Borrowed: x
         // Borrow Rate Per Seconds: y
         // Elapsed Seconds: z
         // Expected interest amount: 0
-        (invalid, interestAmount) = getInterestAmount(
+        interestAmount = getInterestAmount(
             100 * 1e6, // 100 USDT
             3523310220, // Approx 11.75% APY
             86400 // 86400 seconds ~ 24 hours
         );
-        assertFalse(invalid);
         assertEq(interestAmount, 30441); // in 1e6 precision or 0.0304414003 USDT
+
+        // Test with very large numbers
+        interestAmount = getInterestAmount(
+            100 * 1e12 * 1e6, // 100 trillion USDT
+            3523310220, // Approx 11.75% APY
+            60 * 60 * 24 * 7 // Approx 7 weeks
+        );
+        assertEq(interestAmount, 213089802105600000); // in 1e6 precision or 213B USDT
     }
 
     /// @notice Make sure updateVaultStates update the vault states correctly

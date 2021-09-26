@@ -69,12 +69,6 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
 
-    /// @notice Event emitted when the elapsed seconds is invalid
-    event ElapsedSecondsInvalid(
-        uint256 currentTimestamp,
-        uint256 previousTimestamp
-    );
-
     /// @notice Event emitted when the interest amount is invalid
     event InterestAmountInvalid(
         uint256 totalBorrowed,
@@ -258,35 +252,31 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
      * @notice getInterestAmount calculate amount of interest based on the total
      *         borrowed and borrow rate per second.
      * @param borrowedAmount Total of borrowed amount, in underlying decimals
-     * @param borrowRatePerSecondInEther Borrow rates per second, stored as wad number
-     * @param elapsedSeconds Number of seconds elapsed since last collection
-     * @return invalid True if there is an overflow
-     * @return amount The total interest amount, it have similar decimals with
-     *         totalBorrowed and totalCollectedFees. If invalid=true, amount is
-     *         set to zero.
+     * @param borrowRatePerSecondInEther Borrow rates per second in ether units
+     * @param elapsedSeconds Number of seconds elapsed since last accrued
+     * @return The total interest amount, it have similar decimals with
+     *         totalBorrowed and totalCollectedFees.
      */
     function getInterestAmount(
         uint256 borrowedAmount,
         uint256 borrowRatePerSecondInEther,
         uint256 elapsedSeconds
-    ) internal pure returns (bool invalid, uint256 amount) {
+    ) internal pure returns (uint256) {
         // Early returns
         if (
             borrowedAmount == 0 ||
             borrowRatePerSecondInEther == 0 ||
             elapsedSeconds == 0
         ) {
-            return (false, 0);
+            return 0;
         }
 
         // Calculate the amount of interest
         // interest amount = borrowRatePerSecondInEther * elapsedSeconds * borrowedAmount
-        uint256 z; // temporary variable
-        (invalid, z) = mmul(borrowRatePerSecondInEther, elapsedSeconds); // output wad; 1e18 precision
-        if (invalid) return (invalid, 0);
-        (invalid, z) = mmul(z, borrowedAmount); // output wad; 1e18 precision
-        if (invalid) return (invalid, 0);
-        amount = z / ONE_WAD; // Convert to underlying precision/decimals
+        uint256 interestAmount = (borrowRatePerSecondInEther *
+            elapsedSeconds *
+            borrowedAmount) / 1 ether;
+        return interestAmount;
     }
 
     /**
@@ -352,28 +342,14 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         );
 
         // Get time elapsed since last accrued
-        uint256 elapsedSeconds;
-        (invalid, elapsedSeconds) = msub(currentTimestamp, previousTimestamp);
-        if (invalid) {
-            emit ElapsedSecondsInvalid(currentTimestamp, previousTimestamp);
-            return invalid;
-        }
+        uint256 elapsedSeconds = currentTimestamp - previousTimestamp;
 
         // Get the interest amount
-        uint256 interestAmount;
-        (invalid, interestAmount) = getInterestAmount(
+        uint256 interestAmount = getInterestAmount(
             totalBorrowed,
             borrowRatePerSecondInEther,
             elapsedSeconds
         );
-        if (invalid) {
-            emit InterestAmountInvalid(
-                totalBorrowed,
-                borrowRatePerSecondInEther,
-                elapsedSeconds
-            );
-            return invalid;
-        }
 
         // Update the vault states based on the interest amount:
         // totalBorrow & totalCollectedFees
