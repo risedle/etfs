@@ -17,6 +17,7 @@ pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
@@ -34,6 +35,9 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
 
     /// @notice The vault's admin address
     address public admin;
+
+    /// @notice The vault token decimals
+    uint8 private immutable _decimals;
 
     /// @notice The total amount of borrowed assets in the vault
     uint256 public totalBorrowed;
@@ -108,7 +112,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         address indexed account,
         uint256 amount,
         uint256 exchangeRateWad,
-        uint256 mintedAmountWad
+        uint256 mintedAmount
     );
 
     /**
@@ -130,6 +134,9 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         // Set underlying asset contract address
         underlying = underlying_;
 
+        // Set vault token decimals similar to the underlying
+        _decimals = IERC20Metadata(underlying_).decimals();
+
         // Setup admin role
         admin = admin_;
         _setupRole(DEFAULT_ADMIN_ROLE, admin_);
@@ -139,6 +146,12 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         OPTIMAL_UTILIZATION_RATE_WAD = 900000000000000000; // 90% utilization
         INTEREST_SLOPE_1_WAD = 200000000000000000; // 20% slope 1
         INTEREST_SLOPE_2_WAD = 600000000000000000; // 60% slope 2
+    }
+
+    /// @notice Overwrite the vault token decimals
+    /// @dev https://docs.openzeppelin.com/contracts/4.x/erc20
+    function decimals() public view virtual override returns (uint8) {
+        return _decimals;
     }
 
     /**
@@ -491,12 +504,14 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate how much vault token we need to send to the lender
-        uint256 mintedAmountWad = wdiv(amount, exchangeRateWad);
+        uint256 amountWad = mul(amount, ONE_WAD);
+        uint256 mintedAmountWad = wdiv(amountWad, exchangeRateWad);
+        uint256 mintedAmount = mintedAmountWad / ONE_WAD; // Scale down again
 
         // Send vault token to the lender
-        _mint(msg.sender, mintedAmountWad); // rvToken is 18 decimals
+        _mint(msg.sender, mintedAmount); // rvToken is 18 decimals
 
         // Emit event
-        emit SupplyAdded(msg.sender, amount, exchangeRateWad, mintedAmountWad);
+        emit SupplyAdded(msg.sender, amount, exchangeRateWad, mintedAmount);
     }
 }
