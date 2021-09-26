@@ -241,25 +241,27 @@ contract RisedleVaultInternalTest is
 
     /// @notice Make sure updateVaultStates update the vault states correctly
     function test_UpdateVaultStates() public {
-        bool invalid;
-
         // interestAmount=0
         totalBorrowed = 100 * 1e6; // 100 USDT
         totalCollectedFees = 5 * 1e6; // 5 USDT
-        invalid = updateVaultStates(0);
-        assertFalse(invalid);
-        // The totalBorrowed & totalCollectedFees should not updated
+        updateVaultStates(0);
         assertEq(totalBorrowed, 100 * 1e6);
         assertEq(totalCollectedFees, 5 * 1e6);
 
         // interestAmount=10 USDT
         totalBorrowed = 100 * 1e6; // 100 USDT
         totalCollectedFees = 5 * 1e6; // 5 USDT
-        invalid = updateVaultStates(10 * 1e6); // 10 USDT
-        assertFalse(invalid);
+        updateVaultStates(10 * 1e6); // 10 USDT
         // The totalBorrowed & totalCollectedFees should be updated
         assertEq(totalBorrowed, 109000000); // 109 USDT
         assertEq(totalCollectedFees, 6000000); // 6 USDT
+
+        // Test with very large numbers
+        totalBorrowed = 100 * 1e12 * 1e6; // 100 trillion USDT
+        totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT
+        updateVaultStates(10 * 1e12 * 1e6); // 10 trillion USDT
+        assertEq(totalBorrowed, 109 * 1e12 * 1e6); // 109 trillion USDT
+        assertEq(totalCollectedFees, 2 * 1e12 * 1e6); // 2 trillion USDT
     }
 
     /// @notice Make sure accrue interest is working perfectly

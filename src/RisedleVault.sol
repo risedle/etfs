@@ -64,7 +64,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     uint256 public immutable MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
 
     /// @notice Performance fee for the lender
-    uint256 public PERFORMANCE_FEE_WAD = 100000000000000000; // 10% performance fee
+    uint256 public PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
 
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
@@ -282,32 +282,19 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
     /**
      * @notice updateVaultStates update the totalBorrowed and totalCollectedFees
      * @param interestAmount The total of interest amount to be splitted, the decimals
-     *        is similar to the underlying asset.
-     * @return invalid True if there is an overflow
+     *        is similar to totalBorrowed and totalCollectedFees.
      */
-    function updateVaultStates(uint256 interestAmount)
-        internal
-        returns (bool invalid)
-    {
+    function updateVaultStates(uint256 interestAmount) internal {
         // Get the fee
-        uint256 z;
-        (invalid, z) = mmul(PERFORMANCE_FEE_WAD, interestAmount); // In 1e18 precision
-        if (invalid) return invalid;
-        uint256 feeAmount = z / ONE_WAD; // Convert to underlying precision
+        uint256 feeAmount = (PERFORMANCE_FEE_IN_ETHER * interestAmount) /
+            1 ether;
 
         // Get the borrow interest
-        uint256 borrowInterestAmount;
-        (invalid, borrowInterestAmount) = msub(interestAmount, feeAmount);
-        if (invalid) return invalid;
+        uint256 borrowInterestAmount = interestAmount - feeAmount;
 
         // Update the states
-        (invalid, totalBorrowed) = madd(totalBorrowed, borrowInterestAmount);
-        if (invalid) return invalid;
-        (invalid, totalCollectedFees) = madd(totalCollectedFees, feeAmount);
-        if (invalid) return invalid;
-
-        // Set invalid as false
-        return false;
+        totalBorrowed = totalBorrowed + borrowInterestAmount;
+        totalCollectedFees = totalCollectedFees + feeAmount;
     }
 
     /**
@@ -353,11 +340,7 @@ contract RisedleVault is ERC20, AccessControl, DSMath, ReentrancyGuard {
 
         // Update the vault states based on the interest amount:
         // totalBorrow & totalCollectedFees
-        invalid = updateVaultStates(interestAmount);
-        if (invalid) {
-            emit UpdateVaultStateFailed(interestAmount);
-            return invalid;
-        }
+        updateVaultStates(interestAmount);
 
         // Otherwise set the timestamp last accrued and emit event
         lastTimestampInterestAccrued = currentTimestamp;
