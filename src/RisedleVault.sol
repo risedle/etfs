@@ -429,7 +429,8 @@ contract RisedleVault is ERC20, AccessControl, DSMath {
     }
 
     /**
-     * @notice Calculates the exchange rate from the underlying to the rvToken
+     * @notice getExchangeRateWad get the current exchange rate from the
+     *         underlying asset to the token vault.
      * @return invalid True if overflow or underflow happen
      * @return exchangeRateWad The exchange rate stored as wad.
      *         exchangeRateWad=0 if invalid=true
