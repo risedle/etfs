@@ -94,6 +94,13 @@ contract RisedleVaultInternalTest is
         hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailable();
         assertEq(totalAvailable, 0);
+
+        // Test with very high number
+        amount = 100 * 1e12 * 1e6; // 100 trillion USDT
+        totalCollectedFees = 90 * 1e12 * 1e6; // 90 trillion USDT
+        hevm.setUSDTBalance(address(this), amount);
+        totalAvailable = getTotalAvailable();
+        assertEq(totalAvailable, 10 * 1e12 * 1e6); // 10 trillion USDT
     }
 
     /// @notice Make sure the Utilization Rate calculation is correct
