@@ -473,6 +473,11 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         view
         returns (uint256)
     {
+        // If there is no debt, return 0
+        if (totalPrincipalBorrowed == 0 || totalOutstandingDebt == 0) {
+            return 0;
+        }
+
         // Calculate the outstanding debt
         // outstanding debt = ()
         uint256 debtRateEther = (totalOutstandingDebt * 1 ether) /
