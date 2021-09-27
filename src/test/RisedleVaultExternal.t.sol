@@ -59,62 +59,64 @@ contract Lender {
 }
 
 contract RisedleVaultExternalTest is DSTest {
-    RisedleVault rvUSDT;
-    address rvUSDTAdmin;
+    // Test utils
+    address constant USDT_ADDRESS = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    IERC20 constant USDT = IERC20(USDT_ADDRESS);
     HEVM hevm;
 
+    /// @notice Run the test setup
     function setUp() public {
-        // Set this contract as admin
-        rvUSDTAdmin = address(this);
-        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        rvUSDT = new RisedleVault(
+        hevm = new HEVM();
+    }
+
+    /// @notice Utility function to create new vault
+    function createNewVault() internal returns (RisedleVault) {
+        // Create new vault
+        address vaultAdmin = address(this); // Set this contract as admin
+        RisedleVault vault = new RisedleVault(
             "Risedle USDT Vault",
             "rvUSDT",
-            usdtAddress,
-            rvUSDTAdmin
+            USDT_ADDRESS,
+            vaultAdmin
         );
-
-        // Initialize new hevm
-        hevm = new HEVM();
+        return vault;
     }
 
     /// @notice Make sure the admin is properly set
     function test_AdminIsProperlySet() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
         // Make sure the admin is set
-        assertTrue(rvUSDT.hasRole(rvUSDT.DEFAULT_ADMIN_ROLE(), rvUSDTAdmin));
+        assertTrue(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), vault.admin()));
 
         // Check with non-admin address
-        address nonAdmin = address(rvUSDT);
-        assertFalse(rvUSDT.hasRole(rvUSDT.DEFAULT_ADMIN_ROLE(), nonAdmin));
+        address nonAdmin = hevm.addr(2); // random address
+        assertFalse(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), nonAdmin));
     }
 
     /// @notice Make sure admin can grant borrower role
     function test_AdminCanGrantBorrower() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
         // Create new borrower actor
-        Borrower borrower = new Borrower(rvUSDT);
+        Borrower borrower = new Borrower(vault);
 
         // Grant borrower
-        rvUSDT.grantAsBorrower(address(borrower));
+        vault.grantAsBorrower(address(borrower));
 
         // Make sure the role has been set
-        assertTrue(rvUSDT.isBorrower(address(borrower)));
+        assertTrue(vault.isBorrower(address(borrower)));
 
         // Even the admin itself is not borrower
-        assertFalse(rvUSDT.isBorrower(rvUSDTAdmin));
+        assertFalse(vault.isBorrower(vault.admin()));
     }
 
     /// @notice Make sure the lender can supply asset to the vault
     function test_LenderCanAddSupplytToTheVault() public {
         // Create new vault
-        rvUSDTAdmin = address(this); // Set this contract as admin
-        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        IERC20 USDT = IERC20(usdtAddress);
-        RisedleVault vault = new RisedleVault(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            usdtAddress,
-            rvUSDTAdmin
-        );
+        RisedleVault vault = createNewVault();
 
         // Create new lender
         Lender lender = new Lender(vault);
@@ -139,15 +141,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the lender can remove asset from the vault
     function test_LenderCanRemoveSupplyFromTheVault() public {
         // Create new vault
-        rvUSDTAdmin = address(this); // Set this contract as admin
-        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        IERC20 USDT = IERC20(usdtAddress);
-        RisedleVault vault = new RisedleVault(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            usdtAddress,
-            rvUSDTAdmin
-        );
+        RisedleVault vault = createNewVault();
 
         // Create new lender
         Lender lender = new Lender(vault);
@@ -176,14 +170,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure unauthorized borrower cannot borrow
     function testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() public {
         // Create new vault
-        rvUSDTAdmin = address(this); // Set this contract as admin
-        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        RisedleVault vault = new RisedleVault(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            usdtAddress,
-            rvUSDTAdmin
-        );
+        RisedleVault vault = createNewVault();
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
@@ -198,15 +185,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure authorized borrower can borrow
     function test_AuthorizedBorrowerCanBorrowFromTheVault() public {
         // Create new vault
-        rvUSDTAdmin = address(this); // Set this contract as admin
-        address usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-        IERC20 USDT = IERC20(usdtAddress);
-        RisedleVault vault = new RisedleVault(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            usdtAddress,
-            rvUSDTAdmin
-        );
+        RisedleVault vault = createNewVault();
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
