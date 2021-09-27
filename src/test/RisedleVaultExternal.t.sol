@@ -15,14 +15,27 @@ import {RisedleVault} from "../RisedleVault.sol";
 
 /// @notice Dummy contract to simulate the borrower
 contract Borrower {
+    using SafeERC20 for IERC20;
+
+    // Vault
     RisedleVault private _vault;
+    IERC20 underlying;
 
     constructor(RisedleVault vault) {
         _vault = vault;
+        underlying = IERC20(vault.underlying());
     }
 
     function borrow(uint256 amount) public {
         _vault.borrow(amount);
+    }
+
+    function repay(uint256 amount) public {
+        // approve vault to spend the underlying asset
+        underlying.safeApprove(address(_vault), type(uint256).max);
+
+        // Repay underlying asset
+        _vault.repay(amount);
     }
 }
 
@@ -167,51 +180,6 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(USDT.balanceOf(address(lender)), amount);
     }
 
-    /// @notice Make sure unauthorized borrower cannot borrow
-    function testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() public {
-        // Create new vault
-        RisedleVault vault = createNewVault();
-
-        // Add supply to the vault
-        Lender lender = new Lender(vault);
-        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
-        lender.lend(1000 * 1e6); // 1000 USDT
-
-        // Unauthorized borrower borrow from the vault
-        Borrower unauthorizedBorrower = new Borrower(vault);
-        unauthorizedBorrower.borrow(100 * 1e6); // 100 USDT
-    }
-
-    /// @notice Make sure authorized borrower can borrow
-    function test_AuthorizedBorrowerCanBorrowFromTheVault() public {
-        // Create new vault
-        RisedleVault vault = createNewVault();
-
-        // Add supply to the vault
-        Lender lender = new Lender(vault);
-        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
-        lender.lend(1000 * 1e6); // 1000 USDT
-
-        // Authorized borrower borrow from the vault
-        Borrower authorizedBorrower = new Borrower(vault);
-        vault.grantAsBorrower(address(authorizedBorrower));
-
-        // Borrow underlying asset
-        uint256 borrowAmount = 100 * 1e6;
-        authorizedBorrower.borrow(borrowAmount); // 100 USDT
-
-        // Make sure the vault states are updated
-        assertEq(vault.totalOutstandingDebt(), borrowAmount);
-        assertEq(vault.totalPrincipalBorrowed(), borrowAmount);
-        assertEq(
-            vault.getOutstandingDebt(address(authorizedBorrower)),
-            borrowAmount
-        );
-
-        // Make sure the underlying asset is transfered to the borrower
-        assertEq(USDT.balanceOf(address(authorizedBorrower)), borrowAmount);
-    }
-
     /// @notice Make sure the lender earn interest
     function test_LenderShouldEarnInterest() public {
         // Create new vault
@@ -295,5 +263,103 @@ contract RisedleVaultExternalTest is DSTest {
         // The lender B USDT balance should be back without interest
         uint256 lenderBUSDTBalance = USDT.balanceOf(address(lenderB));
         assertEq(lenderBUSDTBalance, 99999999); // 99.99 USDT Rounding down shares
+    }
+
+    /// @notice Make sure unauthorized borrower cannot borrow
+    function testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
+        lender.lend(1000 * 1e6); // 1000 USDT
+
+        // Unauthorized borrower borrow from the vault
+        Borrower unauthorizedBorrower = new Borrower(vault);
+        unauthorizedBorrower.borrow(100 * 1e6); // 100 USDT
+    }
+
+    /// @notice Make sure authorized borrower can borrow
+    function test_AuthorizedBorrowerCanBorrowFromTheVault() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
+        lender.lend(1000 * 1e6); // 1000 USDT
+
+        // Authorized borrower borrow from the vault
+        Borrower authorizedBorrower = new Borrower(vault);
+        vault.grantAsBorrower(address(authorizedBorrower));
+
+        // Borrow underlying asset
+        uint256 borrowAmount = 100 * 1e6;
+        authorizedBorrower.borrow(borrowAmount); // 100 USDT
+
+        // Make sure the vault states are updated
+        assertEq(vault.totalOutstandingDebt(), borrowAmount);
+        assertEq(vault.totalPrincipalBorrowed(), borrowAmount);
+        assertEq(
+            vault.getOutstandingDebt(address(authorizedBorrower)),
+            borrowAmount
+        );
+
+        // Make sure the underlying asset is transfered to the borrower
+        assertEq(USDT.balanceOf(address(authorizedBorrower)), borrowAmount);
+    }
+
+    /// @notice Make sure unauthorized borrower cannot repay
+    function testFail_UnauthorizedBorrowerCannotRepayToTheVault() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Unauthorized borrower repay from the vault
+        Borrower unauthorizedBorrower = new Borrower(vault);
+        hevm.setUSDTBalance(address(unauthorizedBorrower), 100 * 1e6); // 100 USDT
+        unauthorizedBorrower.repay(100 * 1e6); // 100 USDT
+    }
+
+    /// @notice Make sure authorized borrower can borrow
+    function test_AuthorizedBorrowerCanRepayToTheVault() public {
+        // Although we do the borrow & repay, it does accrue the interest
+        // But it doesn't change the outstanding debt due to the delta timestamp
+        // or elapses seconds is zero
+
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Add supply to the vault
+        uint256 supplyAmount = 1000 * 1e6;
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), supplyAmount); // 1000 USDT
+        lender.lend(supplyAmount); // 1000 USDT
+
+        // Authorized borrower borrow from the vault
+        Borrower authorizedBorrower = new Borrower(vault);
+        vault.grantAsBorrower(address(authorizedBorrower));
+
+        // Borrow underlying asset
+        uint256 borrowAmount = 100 * 1e6; // 100 USDT
+        uint256 repayAmount = 50 * 1e6; // 50 USDT
+        authorizedBorrower.borrow(borrowAmount);
+        authorizedBorrower.repay(repayAmount);
+
+        // Make sure the underlying asset is transfered to the borrower & the vault
+        assertEq(
+            USDT.balanceOf(address(authorizedBorrower)),
+            borrowAmount - repayAmount
+        );
+        assertEq(
+            USDT.balanceOf(address(vault)),
+            supplyAmount - (borrowAmount - repayAmount)
+        );
+
+        // Make sure the outstanding debt is correct
+        assertEq(
+            vault.getOutstandingDebt(address(authorizedBorrower)),
+            borrowAmount - repayAmount
+        );
     }
 }
