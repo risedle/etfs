@@ -211,4 +211,44 @@ contract RisedleVaultExternalTest is DSTest {
         // Make sure the underlying asset is transfered to the borrower
         assertEq(USDT.balanceOf(address(authorizedBorrower)), borrowAmount);
     }
+
+    /// @notice Make sure the lender earn interest
+    function test_LenderShouldEarnInterest() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Set the timestamp
+        uint256 previousTimestamp = block.timestamp;
+        hevm.warp(previousTimestamp);
+
+        // Create new lender and borrower
+        Lender lender = new Lender(vault);
+        Borrower borrower = new Borrower(vault);
+
+        // Set lender balance
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
+
+        // Supply asset to the vault
+        lender.lend(100 * 1e6);
+
+        // Grant borrower access
+        vault.grantAsBorrower(address(borrower));
+
+        // Borrow 80 USDT
+        borrower.borrow(80 * 1e6);
+
+        // Utilization rate is 80%, borrow APY 19.45%
+        // After 5 days, the vault token should worth 100.175 USDT
+        hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
+        uint256 expectedLenderVaultTokenWorth = 100175342;
+
+        // Get the current exchange rate
+        uint256 exhangeRateInEther = vault.getCurrentExchangeRateInEther();
+        uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
+        uint256 lenderVaultTokenWorth = (lenderVaultTokenBalance *
+            exhangeRateInEther) / 1 ether;
+
+        // Make sure the lender earn interest
+        assertEq(lenderVaultTokenWorth, expectedLenderVaultTokenWorth);
+    }
 }
