@@ -251,4 +251,49 @@ contract RisedleVaultExternalTest is DSTest {
         // Make sure the lender earn interest
         assertEq(lenderVaultTokenWorth, expectedLenderVaultTokenWorth);
     }
+
+    /// @notice Make sure the lenders earn interest proportionally
+    function test_LendersShouldEarnInterestProportionally() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Set the timestamp
+        uint256 previousTimestamp = block.timestamp;
+        hevm.warp(previousTimestamp);
+
+        // Create new lender and borrower
+        Lender lenderA = new Lender(vault);
+        Lender lenderB = new Lender(vault);
+        Borrower borrower = new Borrower(vault);
+
+        // Set lender balance
+        hevm.setUSDTBalance(address(lenderA), 100 * 1e6); // 100 USDT
+        hevm.setUSDTBalance(address(lenderB), 100 * 1e6); // 100 USDT
+
+        // Lender A lend asset to the vault
+        lenderA.lend(100 * 1e6);
+
+        // Grant borrower access
+        vault.grantAsBorrower(address(borrower));
+
+        // Borrow 80 USDT
+        borrower.borrow(80 * 1e6);
+
+        // Utilization rate is 80%, borrow APY 19.45%
+        // After 5 days, then accrue interest
+        hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
+
+        // Lend & withdraw before accrue interest
+        // The lender B should not get the interest
+        // Interest should automatically accrued when lender lend asset
+        lenderB.lend(100 * 1e6); // 100 USDT
+        uint256 lenderBVaultTokenBalance = vault.balanceOf(address(lenderB));
+
+        // Lender B redeem all vault tokens
+        lenderB.withdraw(lenderBVaultTokenBalance);
+
+        // The lender B USDT balance should be back without interest
+        uint256 lenderBUSDTBalance = USDT.balanceOf(address(lenderB));
+        assertEq(lenderBUSDTBalance, 99999999); // 99.99 USDT Rounding down shares
+    }
 }
