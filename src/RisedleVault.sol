@@ -104,7 +104,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     );
 
     /// @notice Event emitted when borrower borrow from the vault
-    event UnderlyingAssetBorrowed(
+    event Borrowed(
+        address indexed account,
+        uint256 amount,
+        uint256 totalOutstandingDebt
+    );
+
+    /// @notice Event emitted when borrower repay to the vault
+    event Repaid(
         address indexed account,
         uint256 amount,
         uint256 totalOutstandingDebt
@@ -509,6 +516,34 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         underlyingToken.safeTransfer(msg.sender, amount);
 
         // Emit event
-        emit UnderlyingAssetBorrowed(msg.sender, amount, totalOutstandingDebt);
+        emit Borrowed(msg.sender, amount, totalOutstandingDebt);
+    }
+
+    /**
+     * @notice Borrower repay asset to the vault. Only valid borrowers are
+     *         allowed to repay.
+     * @param amount The amount of underlying asset to repay
+     */
+    function repay(uint256 amount)
+        external
+        nonReentrant
+        onlyRole(BORROWER_ROLE)
+    {
+        // Accrue interest
+        accrueInterest();
+
+        // Transfer underlying asset from the borrower to the vault
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        // Do the accounting
+        totalOutstandingDebt = totalOutstandingDebt - amount;
+        totalPrincipalBorrowed = totalPrincipalBorrowed - amount;
+        _principalBorrowed[msg.sender] =
+            _principalBorrowed[msg.sender] -
+            amount;
+
+        // Emit event
+        emit Repaid(msg.sender, amount, totalOutstandingDebt);
     }
 }
