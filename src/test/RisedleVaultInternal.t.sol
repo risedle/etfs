@@ -250,14 +250,14 @@ contract RisedleVaultInternalTest is
         totalCollectedFees = 5 * 1e6; // 5 USDT
         updateVaultStates(10 * 1e6); // 10 USDT
         // The totalOutstandingDebt & totalCollectedFees should be updated
-        assertEq(totalOutstandingDebt, 109000000); // 109 USDT
+        assertEq(totalOutstandingDebt, 110000000); // 110 USDT
         assertEq(totalCollectedFees, 6000000); // 6 USDT
 
         // Test with very large numbers
         totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
         totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT
         updateVaultStates(10 * 1e12 * 1e6); // 10 trillion USDT
-        assertEq(totalOutstandingDebt, 109 * 1e12 * 1e6); // 109 trillion USDT
+        assertEq(totalOutstandingDebt, 110 * 1e12 * 1e6); // 110 trillion USDT
         assertEq(totalCollectedFees, 2 * 1e12 * 1e6); // 2 trillion USDT
     }
 
@@ -283,7 +283,7 @@ contract RisedleVaultInternalTest is
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalCollectedFees are updated
-        assertEq(totalOutstandingDebt, 100042149); // 100 + (90% of interest amount)
+        assertEq(totalOutstandingDebt, 100046832); // 100 + (100% of interest amount)
         assertEq(totalCollectedFees, 20004683); // 20 + (10% of interest amount)
 
         // Scenario 3: Above optimzal utilization rate
@@ -296,7 +296,7 @@ contract RisedleVaultInternalTest is
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalCollectedFees are updated
-        assertEq(totalOutstandingDebt, 400056712); // 400 + (90% of interest amount)
+        assertEq(totalOutstandingDebt, 400063013); // 400 + (100% of interest amount)
         assertEq(totalCollectedFees, 20006301); // 20 + (10% of interest amount)
 
         // Scenario 4: Maximum utilization rate
@@ -309,7 +309,7 @@ contract RisedleVaultInternalTest is
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalCollectedFees are updated
-        assertEq(totalOutstandingDebt, 15024657534); // 400 + (90% of interest amount)
+        assertEq(totalOutstandingDebt, 15027397260); // 400 + (100% of interest amount)
         assertEq(totalCollectedFees, 22739726); // 20 + (10% of interest amount)
     }
 

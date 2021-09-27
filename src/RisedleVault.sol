@@ -297,11 +297,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 feeAmount = (PERFORMANCE_FEE_IN_ETHER * interestAmount) /
             1 ether;
 
-        // Get the borrow interest
-        uint256 borrowInterestAmount = interestAmount - feeAmount;
-
         // Update the states
-        totalOutstandingDebt = totalOutstandingDebt + borrowInterestAmount;
+        totalOutstandingDebt = totalOutstandingDebt + interestAmount;
         totalCollectedFees = totalCollectedFees + feeAmount;
     }
 
