@@ -283,7 +283,7 @@ contract RisedleVaultExternalTest is DSTest {
         // After 5 days, then accrue interest
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
 
-        // Lend & withdraw before accrue interest
+        // Lend & withdraw in the same timestamp
         // The lender B should not get the interest
         // Interest should automatically accrued when lender lend asset
         lenderB.lend(100 * 1e6); // 100 USDT
