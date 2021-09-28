@@ -300,7 +300,7 @@ contract RisedleVaultExternalTest is DSTest {
 
         // Make sure the vault states are updated
         assertEq(vault.totalOutstandingDebt(), borrowAmount);
-        assertEq(vault.totalPrincipalBorrowed(), borrowAmount);
+        assertEq(vault.totalDebtProportion(), borrowAmount); // coz the debt proportion rate is set to 1:1 or 1 ether
         assertEq(
             vault.getOutstandingDebt(address(authorizedBorrower)),
             borrowAmount
@@ -364,7 +364,7 @@ contract RisedleVaultExternalTest is DSTest {
     }
 
     /// @notice Borrower debt should increased when the interest is accrued
-    function test_BorrowerDebtShouldIncreased() public {
+    function test_BorrowersDebtShouldIncreasedProportionally() public {
         // Create new vault
         RisedleVault vault = createNewVault();
 
@@ -377,22 +377,68 @@ contract RisedleVaultExternalTest is DSTest {
         hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
         lender.lend(100 * 1e6); // 100 USDT
 
-        // Create new authorized borrower
-        Borrower borrower = new Borrower(vault);
-        vault.grantAsBorrower(address(borrower));
+        // Create new authorized borrowers
+        Borrower borrowerA = new Borrower(vault);
+        Borrower borrowerB = new Borrower(vault);
+        vault.grantAsBorrower(address(borrowerA));
+        vault.grantAsBorrower(address(borrowerB));
 
-        // Borrow 80 USDT
-        borrower.borrow(80 * 1e6);
-        assertEq(vault.getOutstandingDebt(address(borrower)), 80 * 1e6);
+        // Borrower A borrow 40 USDT
+        borrowerA.borrow(40 * 1e6);
+        assertEq(vault.getOutstandingDebt(address(borrowerA)), 40 * 1e6);
+        assertEq(vault.getDebtProportion(address(borrowerA)), 40 * 1e6); // debt roportion rate is 1:1
 
-        // Utilization rate is 80%, borrow APY 19.45%
+        // Total debt should be correct
+        assertEq(vault.totalOutstandingDebt(), 40 * 1e6); // 40 USDT so far
+
+        // Total collected fees should be correct
+        assertEq(vault.totalCollectedFees(), 0); // 0 USDT so far
+
         // After 5 days, then accrue interest
+        hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
+        previousTimestamp = previousTimestamp + (60 * 60 * 24 * 5);
+
+        // Accrue interest
+        vault.accrueInterest();
+
+        // The debt of borrower A should be increased
+        assertEq(vault.getOutstandingDebt(address(borrowerA)), 40048706);
+        // Debt proportion should not change
+        assertEq(vault.getDebtProportion(address(borrowerA)), 40 * 1e6);
+        // Total debt should be correct
+        assertEq(vault.totalOutstandingDebt(), 40048706); // 40.04870624 USDT so far
+
+        // Borrower B borrow 50 USDT
+        borrowerB.borrow(50 * 1e6);
+
+        // The debt should correct
+        assertEq(vault.getOutstandingDebt(address(borrowerB)), 50 * 1e6);
+        assertEq(vault.getDebtProportion(address(borrowerB)), 49939191); // debt roportion rate is 1:1.001217656
+
+        // Total debt should be correct
+        assertEq(vault.totalOutstandingDebt(), 40048706 + (50 * 1e6)); // 90.04870624 USDT so far
+
+        // Total collected fees should be correct
+        assertEq(vault.totalCollectedFees(), 4870); // 0.004870624049 USDT so far
+
+        // Next 5 days again
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
 
         // Accrue interest
         vault.accrueInterest();
 
-        // The debt should be increased
-        assertEq(vault.getOutstandingDebt(address(borrower)), 80194824);
+        // Total outstanding debt should be correct
+        assertEq(vault.totalOutstandingDebt(), 90296100);
+        assertEq(
+            vault.totalOutstandingDebt() + 1, // Rounding error 0.000001 USDT expected
+            vault.getOutstandingDebt(address(borrowerA)) +
+                vault.getOutstandingDebt(address(borrowerB))
+        );
+
+        // Total outstanding debt for borrower A should be correct
+        assertEq(vault.getOutstandingDebt(address(borrowerA)), 40158734); // 40.15873349 USDT
+
+        // Total outstanding debt for borrower A should be correct
+        assertEq(vault.getOutstandingDebt(address(borrowerB)), 50137367); // 50.1373668 USDT
     }
 }
