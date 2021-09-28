@@ -169,6 +169,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Set fee receiver address
         feeReceiver = feeReceiver_;
 
+        // Initialize the last timestamp accrued
+        lastTimestampInterestAccrued = block.timestamp;
+
         // Set initial interest rate model parameters
         // See visualization here: https://observablehq.com/@pyk/ethrise
         OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
