@@ -35,6 +35,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice The vault's admin address
     address public admin;
 
+    /// @notice The vault's fee address receiver
+    address public feeReceiver;
+
     /// @notice The vault token decimals
     uint8 private immutable _decimals;
 
@@ -119,18 +122,36 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 debtProportionRateInEther
     );
 
+    /// @notice Event emitted when vault parameters are updated
+    event VaultParametersUpdated(
+        address indexed updater,
+        uint256 u,
+        uint256 s1,
+        uint256 s2,
+        uint256 mr,
+        uint256 fee
+    );
+
+    /// @notice Event emitted when the collected fees are withdrawn
+    event FeeCollected(address collector, uint256 total, address feeReceiver);
+
+    /// @notice Event emitted when the fee receiver is updated
+    event FeeReceiverUpdated(address updater, address newFeeReceiver);
+
     /**
      * @notice Contruct new vault
      * @param name The vault's token name
      * @param symbol The vault's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
      * @param admin_ The vault's admin address
+     * @param feeReceiver_ The vault's fee receiver address
      */
     constructor(
         string memory name,
         string memory symbol,
         address underlying_,
-        address admin_
+        address admin_,
+        address feeReceiver_
     ) ERC20(name, symbol) {
         // Sanity check
         IERC20(underlying_).totalSupply();
@@ -144,6 +165,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Setup admin role
         admin = admin_;
         _setupRole(DEFAULT_ADMIN_ROLE, admin_);
+
+        // Set fee receiver address
+        feeReceiver = feeReceiver_;
 
         // Set initial interest rate model parameters
         // See visualization here: https://observablehq.com/@pyk/ethrise
@@ -612,5 +636,40 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         INTEREST_SLOPE_2_IN_ETHER = s2;
         MAX_BORROW_RATE_PER_SECOND_IN_ETHER = mr;
         PERFORMANCE_FEE_IN_ETHER = fee;
+
+        emit VaultParametersUpdated(msg.sender, u, s1, s2, mr, fee);
+    }
+
+    /**
+     * @notice collectFees withdraws collected fees to admin address
+     */
+    function collectFees() external nonReentrant {
+        // Accrue interest
+        accrueInterest();
+
+        // For logging purpose
+        uint256 collectedFees = totalCollectedFees;
+
+        // Transfer underlying asset from the vault to the fee receiver
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.safeTransfer(feeReceiver, collectedFees);
+
+        // Reset the totalCollectedFees
+        totalCollectedFees = 0;
+
+        emit FeeCollected(msg.sender, collectedFees, feeReceiver);
+    }
+
+    /**
+     * @notice updateFeeReceiver updates the fee receiver address.
+     *         Only admin can update.
+     */
+    function updateFeeReceiver(address account)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        feeReceiver = account;
+
+        emit FeeReceiverUpdated(msg.sender, account);
     }
 }
