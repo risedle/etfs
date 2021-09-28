@@ -362,4 +362,37 @@ contract RisedleVaultExternalTest is DSTest {
             borrowAmount - repayAmount
         );
     }
+
+    /// @notice Borrower debt should increased when the interest is accrued
+    function test_BorrowerDebtShouldIncreased() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Set the timestamp
+        uint256 previousTimestamp = block.timestamp;
+        hevm.warp(previousTimestamp);
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
+        lender.lend(100 * 1e6); // 100 USDT
+
+        // Create new authorized borrower
+        Borrower borrower = new Borrower(vault);
+        vault.grantAsBorrower(address(borrower));
+
+        // Borrow 80 USDT
+        borrower.borrow(80 * 1e6);
+        assertEq(vault.getOutstandingDebt(address(borrower)), 80 * 1e6);
+
+        // Utilization rate is 80%, borrow APY 19.45%
+        // After 5 days, then accrue interest
+        hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
+
+        // Accrue interest
+        vault.accrueInterest();
+
+        // The debt should be increased
+        assertEq(vault.getOutstandingDebt(address(borrower)), 80194824);
+    }
 }
