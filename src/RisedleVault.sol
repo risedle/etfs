@@ -66,7 +66,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     uint256 public immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
 
     /// @notice Maximum borrow rate per second in ether units
-    uint256 public immutable MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
+    uint256 public MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
 
     /// @notice Performance fee for the lender
     uint256 public PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
@@ -589,5 +589,28 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
         // Emit event
         emit Repaid(msg.sender, amount, debtProportionRateInEther);
+    }
+
+    /**
+     * @notice updateVaultParameters updates the vault parameters.
+     * @param u The optimal utilization rate in ether units
+     * @param s1 The interest slope 1 in ether units
+     * @param s2 The interest slope 2 in ether units
+     * @param mr The maximum borrow rate per second in ether units
+     * @param fee The performance sharing fee for the lender in ether units
+     */
+    function updateVaultParameters(
+        uint256 u,
+        uint256 s1,
+        uint256 s2,
+        uint256 mr,
+        uint256 fee
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Update vault parameters
+        OPTIMAL_UTILIZATION_RATE_IN_ETHER = u;
+        INTEREST_SLOPE_1_IN_ETHER = s1;
+        INTEREST_SLOPE_2_IN_ETHER = s2;
+        MAX_BORROW_RATE_PER_SECOND_IN_ETHER = mr;
+        PERFORMANCE_FEE_IN_ETHER = fee;
     }
 }
