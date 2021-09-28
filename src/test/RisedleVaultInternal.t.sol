@@ -56,6 +56,9 @@ contract RisedleVaultInternalTest is
         // Make sure total collected fees is zero
         assertEq(totalCollectedFees, 0);
 
+        // Make sure the last timestamp accrued is initialized
+        assertEq(lastTimestampInterestAccrued, block.timestamp);
+
         // Make sure optimal utilization rate is set to 90%
         assertEq(OPTIMAL_UTILIZATION_RATE_IN_ETHER, 900000000000000000);
 

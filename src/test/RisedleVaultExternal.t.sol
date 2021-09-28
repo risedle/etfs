@@ -582,4 +582,34 @@ contract RisedleVaultExternalTest is DSTest {
         // Make sure the fee receiver have totalCollectedFees balance
         assertEq(USDT.balanceOf(feeReceiver), totalCollectedFees);
     }
+
+    /// @notice Test accrue interest as public
+    function test_AnyoneCanAccrueInterest() public {
+        // Set admin and fee receiver
+        address admin = hevm.addr(1);
+        address feeReceiver = hevm.addr(2);
+
+        // Create new vault
+        RisedleVault vault = createNewVault(admin, feeReceiver);
+
+        // Set the timestamp
+        uint256 previousTimestamp = block.timestamp;
+        hevm.warp(previousTimestamp);
+
+        // Public accrue interest
+        vault.accrueInterest();
+
+        // Make sure the lastAccruedInterest is updated
+        assertEq(vault.lastTimestampInterestAccrued(), previousTimestamp);
+
+        // Set the timestamp again
+        uint256 nextTimestamp = previousTimestamp + (60 * 60 * 24 * 7); // +7 days
+        hevm.warp(nextTimestamp);
+
+        // Public accrue interest
+        vault.accrueInterest();
+
+        // Make sure the lastAccruedInterest is updated
+        assertEq(vault.lastTimestampInterestAccrued(), nextTimestamp);
+    }
 }
