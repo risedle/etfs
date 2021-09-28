@@ -71,6 +71,19 @@ contract Lender {
     }
 }
 
+/// @notice Dummy contract to simulate random account to execute collect fee
+contract FeeCollector {
+    RisedleVault _vault;
+
+    constructor(RisedleVault vault) {
+        _vault = vault;
+    }
+
+    function collectFees() public {
+        _vault.collectFees();
+    }
+}
+
 contract RisedleVaultExternalTest is DSTest {
     // Test utils
     address constant USDT_ADDRESS = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
@@ -83,13 +96,17 @@ contract RisedleVaultExternalTest is DSTest {
     }
 
     /// @notice Utility function to create new vault
-    function createNewVault(address admin) internal returns (RisedleVault) {
+    function createNewVault(address admin, address feeReceiver)
+        internal
+        returns (RisedleVault)
+    {
         // Create new vault
         RisedleVault vault = new RisedleVault(
             "Risedle USDT Vault",
             "rvUSDT",
             USDT_ADDRESS,
-            admin
+            admin,
+            feeReceiver
         );
         return vault;
     }
@@ -97,7 +114,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the admin is properly set
     function test_AdminIsProperlySet() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Make sure the admin is set
         assertTrue(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), vault.admin()));
@@ -110,7 +127,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure admin can grant borrower role
     function test_AdminCanGrantBorrower() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Create new borrower actor
         Borrower borrower = new Borrower(vault);
@@ -128,7 +145,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the lender can supply asset to the vault
     function test_LenderCanAddSupplytToTheVault() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Create new lender
         Lender lender = new Lender(vault);
@@ -153,7 +170,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the lender can remove asset from the vault
     function test_LenderCanRemoveSupplyFromTheVault() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Create new lender
         Lender lender = new Lender(vault);
@@ -182,7 +199,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the lender earn interest
     function test_LenderShouldEarnInterest() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;
@@ -222,7 +239,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure the lenders earn interest proportionally
     function test_LendersShouldEarnInterestProportionally() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;
@@ -267,7 +284,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure unauthorized borrower cannot borrow
     function testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
@@ -282,7 +299,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure authorized borrower can borrow
     function test_AuthorizedBorrowerCanBorrowFromTheVault() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
@@ -312,7 +329,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure unauthorized borrower cannot repay
     function testFail_UnauthorizedBorrowerCannotRepayToTheVault() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Unauthorized borrower repay from the vault
         Borrower unauthorizedBorrower = new Borrower(vault);
@@ -327,7 +344,7 @@ contract RisedleVaultExternalTest is DSTest {
         // or elapses seconds is zero
 
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Add supply to the vault
         uint256 supplyAmount = 1000 * 1e6;
@@ -367,7 +384,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Borrower debt should increased when the interest is accrued
     function test_BorrowersDebtShouldIncreasedProportionally() public {
         // Create new vault
-        RisedleVault vault = createNewVault(address(this));
+        RisedleVault vault = createNewVault(address(this), address(this));
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;
@@ -446,7 +463,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure non-admin cannot update vault parameters
     function testFail_NonAdminCannotUpdateVaultParameters() public {
         address admin = hevm.addr(2); // Use random address as admin
-        RisedleVault vault = createNewVault(admin);
+        RisedleVault vault = createNewVault(admin, admin);
 
         // Make sure this is fail
         vault.updateVaultParameters(
@@ -461,7 +478,7 @@ contract RisedleVaultExternalTest is DSTest {
     /// @notice Make sure admin can update the vault parameters
     function test_AdminCanUpdateVaultParameters() public {
         address admin = address(this); // Set this contract as vault admin
-        RisedleVault vault = createNewVault(admin);
+        RisedleVault vault = createNewVault(admin, admin);
 
         // Update vault's parameters
         uint256 optimalUtilizationRate = 0.8 ether;
@@ -489,5 +506,80 @@ contract RisedleVaultExternalTest is DSTest {
             maxBorrowRatePerSeconds
         );
         assertEq(vault.PERFORMANCE_FEE_IN_ETHER(), fee);
+    }
+
+    /// @notice Make sure non-admin cannot change the fee receiver
+    function testFail_NonAdminCannotUpdateFeeReceiverAddress() public {
+        // Set admin
+        address admin = hevm.addr(2);
+
+        RisedleVault vault = createNewVault(admin, admin);
+
+        // Make sure it fails
+        vault.updateFeeReceiver(hevm.addr(3));
+    }
+
+    /// @notice Make sure admin can update the fee receiver
+    function test_AdminCanUpdateFeeReceiverAddress() public {
+        // Set this contract as admin
+        address admin = address(this);
+        address feeReceiver = admin;
+        address newReceiver = hevm.addr(2);
+
+        // Create new vault
+        RisedleVault vault = createNewVault(admin, feeReceiver);
+
+        // Update the fee receiver
+        vault.updateFeeReceiver(newReceiver);
+
+        // Make sure the fee receiver is updated
+        assertEq(vault.feeReceiver(), newReceiver);
+    }
+
+    /// @notice Make sure anyone can send collected fees to fee receiver
+    function test_AnyoneCanSendCollectedFeesToFeeReceiver() public {
+        // Set admin and fee receiver
+        address admin = address(this);
+        address feeReceiver = hevm.addr(3);
+
+        // Create new vault
+        RisedleVault vault = createNewVault(admin, feeReceiver);
+
+        // Simulate the borrowing activities
+
+        // Set the timestamp
+        uint256 previousTimestamp = block.timestamp;
+        hevm.warp(previousTimestamp);
+
+        // Add supply to the vault
+        Lender lender = new Lender(vault);
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
+        lender.lend(100 * 1e6); // 100 USDT
+
+        // Create new authorized borrowers
+        Borrower borrower = new Borrower(vault);
+        vault.grantAsBorrower(address(borrower));
+
+        // Borrow asset
+        borrower.borrow(90 * 1e6); // Borrow 90 USDT
+
+        // Change the timestamp to 7 days
+        hevm.warp(previousTimestamp + (60 * 60 * 24 * 7));
+
+        // Accrue interest
+        vault.accrueInterest();
+
+        // Get the toal collected fees
+        uint256 totalCollectedFees = vault.totalCollectedFees();
+
+        // Public collect fees
+        FeeCollector collector = new FeeCollector(vault);
+        collector.collectFees();
+
+        // Make sure totalCollectedFees is set to zero
+        assertEq(vault.totalCollectedFees(), 0);
+
+        // Make sure the fee receiver have totalCollectedFees balance
+        assertEq(USDT.balanceOf(feeReceiver), totalCollectedFees);
     }
 }

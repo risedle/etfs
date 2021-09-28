@@ -16,11 +16,18 @@ import {RisedleVault} from "../RisedleVault.sol";
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
 address constant usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-address constant rvUSDTAdmin = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random admin
+address constant vaultAdmin = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random admin
+address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
 contract RisedleVaultInternalTest is
     DSTest,
-    RisedleVault(vaultTokenName, vaultTokenSymbol, usdtAddress, rvUSDTAdmin)
+    RisedleVault(
+        vaultTokenName,
+        vaultTokenSymbol,
+        usdtAddress,
+        vaultAdmin,
+        vaultFeeReceiver
+    )
 {
     /// @notice hevm utils to alter mainnet state
     HEVM hevm;
@@ -35,7 +42,10 @@ contract RisedleVaultInternalTest is
         assertEq(underlying, usdtAddress);
 
         // Make sure admin address is correct
-        assertEq(admin, rvUSDTAdmin);
+        assertEq(admin, vaultAdmin);
+
+        // Make sure the fee receiver is correct
+        assertEq(feeReceiver, vaultFeeReceiver);
 
         // Make sure total outstanding debt is zero
         assertEq(totalOutstandingDebt, 0);
