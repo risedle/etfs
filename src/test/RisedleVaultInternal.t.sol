@@ -40,6 +40,9 @@ contract RisedleVaultInternalTest is
         // Make sure total outstanding debt is zero
         assertEq(totalOutstandingDebt, 0);
 
+        // Make sure total debt proportion is zero
+        assertEq(totalDebtProportion, 0);
+
         // Make sure total collected fees is zero
         assertEq(totalCollectedFees, 0);
 
@@ -363,5 +366,34 @@ contract RisedleVaultInternalTest is
         totalCollectedFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)
         exchangeRateInETher = getExchangeRateInEther();
         assertEq(exchangeRateInETher, 1.08 ether); // 1.08
+    }
+
+    /// @notice Make sure the debt proportion rate is correct
+    function test_GetDebtProportionRateInEther() public {
+        uint256 debtProportionRateInEther;
+
+        // Initial rate should be 1 ether
+        totalOutstandingDebt = 0;
+        totalDebtProportion = 0;
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        assertEq(debtProportionRateInEther, 1 ether);
+
+        // If total outstanding debt is equal to proportion then the rate should be 1
+        totalOutstandingDebt = 100 * 1e6; // 100 USDT
+        totalDebtProportion = 100 * 1e6; // 100 USDT
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        assertEq(debtProportionRateInEther, 1 ether);
+
+        // If interest accrued, total outstanding debt is larger than the total debt proportion
+        totalOutstandingDebt = 120 * 1e6; // 120 USDT
+        totalDebtProportion = 100 * 1e6; // 100 USDT
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        assertEq(debtProportionRateInEther, 1.2 ether);
+
+        // Test with very large number
+        totalOutstandingDebt = 120 * 1e12 * 1e6; // 120 trillion USDT
+        totalDebtProportion = 100 * 1e12 * 1e6; // 100 trillion USDT
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        assertEq(debtProportionRateInEther, 1.2 ether);
     }
 }
