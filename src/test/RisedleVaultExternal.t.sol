@@ -344,6 +344,8 @@ contract RisedleVaultExternalTest is DSTest {
         uint256 borrowAmount = 100 * 1e6; // 100 USDT
         uint256 repayAmount = 50 * 1e6; // 50 USDT
         authorizedBorrower.borrow(borrowAmount);
+
+        // Repay underlying asset
         authorizedBorrower.repay(repayAmount);
 
         // Make sure the underlying asset is transfered to the borrower & the vault
