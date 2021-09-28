@@ -38,15 +38,17 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice The vault token decimals
     uint8 private immutable _decimals;
 
-    /// @notice The total amount of borrowed assets in the vault
-    uint256 public totalPrincipalBorrowed;
-
     /// @notice The total amount of principal borrowed plus interest accrued
     uint256 public totalOutstandingDebt;
 
-    /// @notice Mapping borrower to their borrow amount
-    /// @dev total debts per borrower = (totalOutstandingDebts / totalPrincipalBorrowed) * principalBorrowed[borrower]
-    mapping(address => uint256) private _principalBorrowed;
+    /// @notice The total debt proportion issued by the vault, the usage is
+    ///         similar to the vault token supply. In order to track the
+    ///         outstanding debt of the borrower
+    uint256 public totalDebtProportion;
+
+    /// @notice Mapping borrower to their debt proportion of totalOutstandingDebt
+    /// @dev debt = _debtProportion[borrower] * debtProportionRate
+    mapping(address => uint256) private _debtProportion;
 
     /// @notice The total amount of collected fees in the vault
     uint256 public totalCollectedFees;
@@ -107,14 +109,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     event Borrowed(
         address indexed account,
         uint256 amount,
-        uint256 totalOutstandingDebt
+        uint256 debtProportionRateInEther
     );
 
     /// @notice Event emitted when borrower repay to the vault
     event Repaid(
         address indexed account,
         uint256 amount,
-        uint256 totalOutstandingDebt
+        uint256 debtProportionRateInEther
     );
 
     /**
@@ -469,6 +471,20 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
+     * @notice getDebtProportionRateInEther returns the proportion of borrow
+     *         amount relative to the totalOutstandingDebt
+     * @return The debt proportion rate in ether units
+     */
+    function getDebtProportionRateInEther() internal view returns (uint256) {
+        if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
+            return 1 ether;
+        }
+        uint256 debtProportionRateInEther = (totalOutstandingDebt * 1 ether) /
+            totalDebtProportion;
+        return debtProportionRateInEther;
+    }
+
+    /**
      * @notice getOutstandingDebt returns the debt owed by the borrower
      * @param account The borrower address
      */
@@ -478,17 +494,30 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         returns (uint256)
     {
         // If there is no debt, return 0
-        if (totalPrincipalBorrowed == 0 || totalOutstandingDebt == 0) {
+        if (totalOutstandingDebt == 0) {
             return 0;
         }
 
         // Calculate the outstanding debt
-        // outstanding debt = ()
-        uint256 debtRateEther = (totalOutstandingDebt * 1 ether) /
-            totalPrincipalBorrowed;
-        uint256 outstandingDebt = (debtRateEther *
-            _principalBorrowed[account]) / 1 ether;
+        // outstanding debt = debtProportion * debtProportionRate
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        uint256 a = (_debtProportion[account] * debtProportionRateInEther);
+        uint256 b = 1 ether;
+        uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
+
         return outstandingDebt;
+    }
+
+    /**
+     * @notice getDebtProportion returns the current debt proportion of the borrower
+     * @param account The borrower address
+     */
+    function getDebtProportion(address account)
+        external
+        view
+        returns (uint256)
+    {
+        return _debtProportion[account];
     }
 
     /**
@@ -504,19 +533,26 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Accrue interest
         accrueInterest();
 
-        // Do the accounting
+        // Get the debt proportion rate first
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+
+        // Get the borrower amount proportion to existing totalOutstandingDebt
+        uint256 borrowProportion = (amount * 1 ether) /
+            debtProportionRateInEther;
+
+        // Do the accounting first before transfering any asset
         totalOutstandingDebt = totalOutstandingDebt + amount;
-        totalPrincipalBorrowed = totalPrincipalBorrowed + amount;
-        _principalBorrowed[msg.sender] =
-            _principalBorrowed[msg.sender] +
-            amount;
+        totalDebtProportion = totalDebtProportion + borrowProportion;
+        _debtProportion[msg.sender] =
+            _debtProportion[msg.sender] +
+            borrowProportion;
 
         // Transfer underlying asset from the vault to the borrower
         IERC20 underlyingToken = IERC20(underlying);
         underlyingToken.safeTransfer(msg.sender, amount);
 
         // Emit event
-        emit Borrowed(msg.sender, amount, totalOutstandingDebt);
+        emit Borrowed(msg.sender, amount, debtProportionRateInEther);
     }
 
     /**
@@ -536,14 +572,22 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         IERC20 underlyingToken = IERC20(underlying);
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
 
+        // Get the debt proportion rate first
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+
+        // Calculate how many debtProportion we need to substract from borrower
+        // and totalDebtProportion based on the repay amount
+        uint256 repayProportion = (amount * 1 ether) /
+            debtProportionRateInEther;
+
         // Do the accounting
         totalOutstandingDebt = totalOutstandingDebt - amount;
-        totalPrincipalBorrowed = totalPrincipalBorrowed - amount;
-        _principalBorrowed[msg.sender] =
-            _principalBorrowed[msg.sender] -
-            amount;
+        totalDebtProportion = totalDebtProportion - repayProportion;
+        _debtProportion[msg.sender] =
+            _debtProportion[msg.sender] -
+            repayProportion;
 
         // Emit event
-        emit Repaid(msg.sender, amount, totalOutstandingDebt);
+        emit Repaid(msg.sender, amount, debtProportionRateInEther);
     }
 }
