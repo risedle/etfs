@@ -41,6 +41,9 @@ contract RisedleETF is ERC20, AccessControl {
     /// @dev For example 100 USDT would be 100 * 1e6, coz USDT have 6 decimals
     uint256 public immutable INITIAL_ETF_PRICE;
 
+    /// @notice Event emitted when the vault is set
+    event ETFVaultConfigured(address setter, address vault);
+
     /**
      * @notice Construct new ETF
      * @param name The ETF's name
@@ -90,6 +93,8 @@ contract RisedleETF is ERC20, AccessControl {
 
         // Set the vault address
         vault = vault_;
+
+        emit ETFVaultConfigured(msg.sender, vault_);
     }
 
     /// @notice getTotalSupply returns the total supply of the ETF token
