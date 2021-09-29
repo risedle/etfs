@@ -44,6 +44,9 @@ contract RisedleETF is ERC20, AccessControl {
     /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
 
+    /// @notice Event emitted when the fee receiver is updated
+    event FeeReceiverUpdated(address updater, address newFeeReceiver);
+
     /**
      * @notice Construct new ETF
      * @param name The ETF's name
@@ -76,6 +79,9 @@ contract RisedleETF is ERC20, AccessControl {
 
         // Set the initial price
         INITIAL_ETF_PRICE = initialETFPrice;
+
+        // Set vault added to false
+        vaultAdded = false;
     }
 
     /**
@@ -84,16 +90,12 @@ contract RisedleETF is ERC20, AccessControl {
      */
     function setVault(address vault_) public {
         require(!vaultAdded, "ALREADY_INITIALIZED");
-
         // Set vaultAdded to true
         vaultAdded = true;
-
         // Sanity check
         IRisedleVault(vault_).totalOutstandingDebt();
-
         // Set the vault address
         vault = vault_;
-
         emit ETFVaultConfigured(msg.sender, vault_);
     }
 
@@ -101,5 +103,18 @@ contract RisedleETF is ERC20, AccessControl {
     function getTotalSupply() internal view returns (uint256) {
         IERC20 etfToken = IERC20(address(this));
         return etfToken.totalSupply();
+    }
+
+    /**
+     * @notice updateFeeReceiver updates the fee receiver address.
+     * @dev Only governor can call this function
+     */
+    function updateFeeReceiver(address account)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        feeReceiver = account;
+
+        emit FeeReceiverUpdated(msg.sender, account);
     }
 }
