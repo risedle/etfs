@@ -16,7 +16,7 @@ import {RisedleVault} from "../RisedleVault.sol";
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
 address constant usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-address constant vaultAdmin = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random admin
+address constant vaultGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
 address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
 contract RisedleVaultInternalTest is
@@ -25,7 +25,7 @@ contract RisedleVaultInternalTest is
         vaultTokenName,
         vaultTokenSymbol,
         usdtAddress,
-        vaultAdmin,
+        vaultGovernor,
         vaultFeeReceiver
     )
 {
@@ -41,8 +41,8 @@ contract RisedleVaultInternalTest is
         // Make sure underlying asset is correct
         assertEq(underlying, usdtAddress);
 
-        // Make sure admin address is correct
-        assertEq(admin, vaultAdmin);
+        // Make sure the governor address is correct
+        assertEq(governor, vaultGovernor);
 
         // Make sure the fee receiver is correct
         assertEq(feeReceiver, vaultFeeReceiver);

@@ -96,7 +96,7 @@ contract RisedleVaultExternalTest is DSTest {
     }
 
     /// @notice Utility function to create new vault
-    function createNewVault(address admin, address feeReceiver)
+    function createNewVault(address governor, address feeReceiver)
         internal
         returns (RisedleVault)
     {
@@ -105,27 +105,27 @@ contract RisedleVaultExternalTest is DSTest {
             "Risedle USDT Vault",
             "rvUSDT",
             USDT_ADDRESS,
-            admin,
+            governor,
             feeReceiver
         );
         return vault;
     }
 
-    /// @notice Make sure the admin is properly set
-    function test_AdminIsProperlySet() public {
+    /// @notice Make sure the governor is properly set
+    function test_GovernorIsProperlySet() public {
         // Create new vault
         RisedleVault vault = createNewVault(address(this), address(this));
 
-        // Make sure the admin is set
-        assertTrue(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), vault.admin()));
+        // Make sure the governor is set
+        assertTrue(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), vault.governor()));
 
-        // Check with non-admin address
-        address nonAdmin = hevm.addr(2); // random address
-        assertFalse(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), nonAdmin));
+        // Check with non-governor address
+        address nonGovernor = hevm.addr(2); // random address
+        assertFalse(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), nonGovernor));
     }
 
-    /// @notice Make sure admin can grant borrower role
-    function test_AdminCanGrantBorrower() public {
+    /// @notice Make sure governor can grant borrower role
+    function test_GovernorCanGrantBorrower() public {
         // Create new vault
         RisedleVault vault = createNewVault(address(this), address(this));
 
@@ -138,8 +138,8 @@ contract RisedleVaultExternalTest is DSTest {
         // Make sure the role has been set
         assertTrue(vault.isBorrower(address(borrower)));
 
-        // Even the admin itself is not borrower
-        assertFalse(vault.isBorrower(vault.admin()));
+        // Even the governor itself is not borrower
+        assertFalse(vault.isBorrower(vault.governor()));
     }
 
     /// @notice Make sure the lender can supply asset to the vault
@@ -460,10 +460,10 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.getOutstandingDebt(address(borrowerB)), 50137367); // 50.1373668 USDT
     }
 
-    /// @notice Make sure non-admin cannot update vault parameters
-    function testFail_NonAdminCannotUpdateVaultParameters() public {
-        address admin = hevm.addr(2); // Use random address as admin
-        RisedleVault vault = createNewVault(admin, admin);
+    /// @notice Make sure non-governor account cannot update vault parameters
+    function testFail_NonGovernorCannotUpdateVaultParameters() public {
+        address governor = hevm.addr(2); // Use random address as governor
+        RisedleVault vault = createNewVault(governor, governor);
 
         // Make sure this is fail
         vault.updateVaultParameters(
@@ -475,10 +475,10 @@ contract RisedleVaultExternalTest is DSTest {
         );
     }
 
-    /// @notice Make sure admin can update the vault parameters
-    function test_AdminCanUpdateVaultParameters() public {
-        address admin = address(this); // Set this contract as vault admin
-        RisedleVault vault = createNewVault(admin, admin);
+    /// @notice Make sure governor can update the vault parameters
+    function test_GovernorCanUpdateVaultParameters() public {
+        address governor = address(this); // Set this contract as vault governor
+        RisedleVault vault = createNewVault(governor, governor);
 
         // Update vault's parameters
         uint256 optimalUtilizationRate = 0.8 ether;
@@ -508,26 +508,26 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.PERFORMANCE_FEE_IN_ETHER(), fee);
     }
 
-    /// @notice Make sure non-admin cannot change the fee receiver
-    function testFail_NonAdminCannotUpdateFeeReceiverAddress() public {
-        // Set admin
-        address admin = hevm.addr(2);
+    /// @notice Make sure non-governor account cannot change the fee receiver
+    function testFail_NonGovernorCannotUpdateFeeReceiverAddress() public {
+        // Set governor
+        address governor = hevm.addr(2);
 
-        RisedleVault vault = createNewVault(admin, admin);
+        RisedleVault vault = createNewVault(governor, governor);
 
         // Make sure it fails
         vault.updateFeeReceiver(hevm.addr(3));
     }
 
-    /// @notice Make sure admin can update the fee receiver
-    function test_AdminCanUpdateFeeReceiverAddress() public {
-        // Set this contract as admin
-        address admin = address(this);
-        address feeReceiver = admin;
+    /// @notice Make sure governor can update the fee receiver
+    function test_GovernorCanUpdateFeeReceiverAddress() public {
+        // Set this contract as governor
+        address governor = address(this);
+        address feeReceiver = governor;
         address newReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(admin, feeReceiver);
+        RisedleVault vault = createNewVault(governor, feeReceiver);
 
         // Update the fee receiver
         vault.updateFeeReceiver(newReceiver);
@@ -538,12 +538,12 @@ contract RisedleVaultExternalTest is DSTest {
 
     /// @notice Make sure anyone can send collected fees to fee receiver
     function test_AnyoneCanSendCollectedFeesToFeeReceiver() public {
-        // Set admin and fee receiver
-        address admin = address(this);
+        // Set governor and fee receiver
+        address governor = address(this);
         address feeReceiver = hevm.addr(3);
 
         // Create new vault
-        RisedleVault vault = createNewVault(admin, feeReceiver);
+        RisedleVault vault = createNewVault(governor, feeReceiver);
 
         // Simulate the borrowing activities
 
@@ -585,12 +585,12 @@ contract RisedleVaultExternalTest is DSTest {
 
     /// @notice Test accrue interest as public
     function test_AnyoneCanAccrueInterest() public {
-        // Set admin and fee receiver
-        address admin = hevm.addr(1);
+        // Set governor and fee receiver
+        address governor = hevm.addr(1);
         address feeReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(admin, feeReceiver);
+        RisedleVault vault = createNewVault(governor, feeReceiver);
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;

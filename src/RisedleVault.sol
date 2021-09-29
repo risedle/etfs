@@ -32,10 +32,10 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice The underlying assets address contract (ERC20)
     address public immutable underlying;
 
-    /// @notice The vault's admin address
-    address public admin;
+    /// @notice The Vault's governor address
+    address public governor;
 
-    /// @notice The vault's fee address receiver
+    /// @notice The Vault's fee receiver address
     address public feeReceiver;
 
     /// @notice The vault token decimals
@@ -140,17 +140,17 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice Contruct new vault
-     * @param name The vault's token name
-     * @param symbol The vault's token symbol
+     * @param name The Vault's token name
+     * @param symbol The Vault's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
-     * @param admin_ The vault's admin address
-     * @param feeReceiver_ The vault's fee receiver address
+     * @param governor_ The Vault's governor address
+     * @param feeReceiver_ The Vault's fee receiver address
      */
     constructor(
         string memory name,
         string memory symbol,
         address underlying_,
-        address admin_,
+        address governor_,
         address feeReceiver_
     ) ERC20(name, symbol) {
         // Sanity check
@@ -162,9 +162,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Set vault token decimals similar to the underlying
         _decimals = IERC20Metadata(underlying_).decimals();
 
-        // Setup admin role
-        admin = admin_;
-        _setupRole(DEFAULT_ADMIN_ROLE, admin_);
+        // Setup governor role
+        governor = governor_;
+        _setupRole(DEFAULT_ADMIN_ROLE, governor_);
 
         // Set fee receiver address
         feeReceiver = feeReceiver_;
@@ -187,7 +187,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice grantAsBorrower grants account access to borrow the underlying asset of RisedleUSD
-     * @dev Only admin can call this function
+     * @dev Only governor can call this function
      * @param account The contract address granted access to borrow
      */
     function grantAsBorrower(address account)
@@ -644,7 +644,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice collectFees withdraws collected fees to admin address
+     * @notice collectFees withdraws collected fees to the feeReceiver address
      */
     function collectFees() external nonReentrant {
         // Accrue interest
@@ -665,7 +665,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice updateFeeReceiver updates the fee receiver address.
-     *         Only admin can update.
+     *         Only governor can update.
      */
     function updateFeeReceiver(address account)
         external
