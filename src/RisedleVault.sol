@@ -53,8 +53,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @dev debt = _debtProportion[borrower] * debtProportionRate
     mapping(address => uint256) private _debtProportion;
 
-    /// @notice The total amount of collected fees in the vault
-    uint256 public totalCollectedFees;
+    /// @notice The total amount of pending fees to be collected in the vault
+    uint256 public totalPendingFees;
 
     /// @notice Optimal utilization rate in ether units
     uint256 public OPTIMAL_UTILIZATION_RATE_IN_ETHER;
@@ -82,14 +82,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         uint256 previousTimestamp,
         uint256 currentTimestamp,
         uint256 previousTotalOutstandingDebt,
-        uint256 previousTotalCollectedFees,
+        uint256 previoustotalPendingFees,
         uint256 totalAvailable,
         uint256 utilizationRateInEther,
         uint256 borrowRatePerSecondInEther,
         uint256 elapsedSeconds,
         uint256 interestAmount,
         uint256 totalOutstandingDebt,
-        uint256 totalCollectedFees
+        uint256 totalPendingFees
     );
 
     /// @notice Event emitted when lender add supply to the vault
@@ -186,9 +186,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice grantAsBorrower grants account access to borrow the underlying asset of RisedleUSD
+     * @notice grantAsBorrower grants account to borrow the underlying asset
      * @dev Only governor can call this function
-     * @param account The contract address granted access to borrow
+     * @param account The contract address granted to borrow
      */
     function grantAsBorrower(address account)
         external
@@ -199,9 +199,10 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice isBorrower returns true if account is borrower
-     * @param account The contract address
+     * @param account The account/contract address
+     * @return True if account have been granted as borrower
      */
-    function isBorrower(address account) public view returns (bool) {
+    function isBorrower(address account) external view returns (bool) {
         return hasRole(BORROWER_ROLE, account);
     }
 
@@ -213,8 +214,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     function getTotalAvailableCash() internal view returns (uint256) {
         IERC20 underlyingToken = IERC20(underlying);
         uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
-        if (totalCollectedFees >= underlyingBalance) return 0;
-        return underlyingBalance - totalCollectedFees;
+        if (totalPendingFees >= underlyingBalance) return 0;
+        return underlyingBalance - totalPendingFees;
     }
 
     /**
@@ -227,7 +228,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     function getUtilizationRateInEther(
         uint256 available,
         uint256 outstandingDebt
-    ) internal pure returns (uint256) {
+    ) public pure returns (uint256) {
         // Utilization rate is 0% when there is no outstandingDebt asset
         if (outstandingDebt == 0) return 0;
 
@@ -247,7 +248,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @return The borrow rate per second in ether units
      */
     function getBorrowRatePerSecondInEther(uint256 utilizationRateInEther)
-        internal
+        public
         view
         returns (uint256)
     {
@@ -299,7 +300,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @param borrowRatePerSecondInEther Borrow rates per second in ether units
      * @param elapsedSeconds Number of seconds elapsed since last accrued
      * @return The total interest amount, it have similar decimals with
-     *         totalOutstandingDebt and totalCollectedFees.
+     *         totalOutstandingDebt and totalPendingFees.
      */
     function getInterestAmount(
         uint256 outstandingDebt,
@@ -324,9 +325,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice updateVaultStates update the totalOutstandingDebt and totalCollectedFees
+     * @notice updateVaultStates update the totalOutstandingDebt and totalPendingFees
      * @param interestAmount The total of interest amount to be splitted, the decimals
-     *        is similar to totalOutstandingDebt and totalCollectedFees.
+     *        is similar to totalOutstandingDebt and totalPendingFees.
      */
     function updateVaultStates(uint256 interestAmount) internal {
         // Get the fee
@@ -335,13 +336,13 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
         // Update the states
         totalOutstandingDebt = totalOutstandingDebt + interestAmount;
-        totalCollectedFees = totalCollectedFees + feeAmount;
+        totalPendingFees = totalPendingFees + feeAmount;
     }
 
     /**
-     * @notice accrueInterest accrues interest to totalOutstandingDebt and totalCollectedFees
+     * @notice accrueInterest accrues interest to totalOutstandingDebt and totalPendingFees
      * @dev This calculates interest accrued from the last checkpointed timestamp
-     *      up to the current timestamp and update the totalOutstandingDebt and totalCollectedFees
+     *      up to the current timestamp and update the totalOutstandingDebt and totalPendingFees
      */
     function accrueInterest() public {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
@@ -353,7 +354,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
         // For logging purpose
         uint256 previousTotalOutstandingDebt = totalOutstandingDebt;
-        uint256 previousTotalCollectedFees = totalCollectedFees;
+        uint256 previoustotalPendingFees = totalPendingFees;
 
         // Get total amount available to borrow
         uint256 totalAvailable = getTotalAvailableCash();
@@ -380,7 +381,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         );
 
         // Update the vault states based on the interest amount:
-        // totalOutstandingDebt & totalCollectedFees
+        // totalOutstandingDebt & totalPendingFees
         updateVaultStates(interestAmount);
 
         // Otherwise set the timestamp last accrued and emit event
@@ -389,14 +390,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
             previousTimestamp,
             currentTimestamp,
             previousTotalOutstandingDebt,
-            previousTotalCollectedFees,
+            previoustotalPendingFees,
             totalAvailable,
             utilizationRateInEther,
             borrowRatePerSecondInEther,
             elapsedSeconds,
             interestAmount,
             totalOutstandingDebt,
-            totalCollectedFees
+            totalPendingFees
         );
     }
 
@@ -548,8 +549,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice Borrower borrow asset from the vault. Only valid borrowers are
-     *         allowed to borrow.
+     * @notice Borrower borrow asset from the vault
+     * @dev Only authorized borrowers are allowed to borrow
      * @param amount The amount of underlying asset to borrow
      */
     function borrow(uint256 amount)
@@ -583,8 +584,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice Borrower repay asset to the vault. Only valid borrowers are
-     *         allowed to repay.
+     * @notice Borrower repay asset to the vault
+     * @dev Only authotized borrowers are allowed to repay
      * @param amount The amount of underlying asset to repay
      */
     function repay(uint256 amount)
@@ -620,6 +621,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /**
      * @notice updateVaultParameters updates the vault parameters.
+     * @dev Only governor can call this function
      * @param u The optimal utilization rate in ether units
      * @param s1 The interest slope 1 in ether units
      * @param s2 The interest slope 2 in ether units
@@ -644,28 +646,29 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice collectFees withdraws collected fees to the feeReceiver address
+     * @notice collectPendingFees withdraws collected fees to the feeReceiver address
+     * @dev Anyone can call this function
      */
-    function collectFees() external nonReentrant {
+    function collectPendingFees() external nonReentrant {
         // Accrue interest
         accrueInterest();
 
         // For logging purpose
-        uint256 collectedFees = totalCollectedFees;
+        uint256 collectedFees = totalPendingFees;
 
         // Transfer underlying asset from the vault to the fee receiver
         IERC20 underlyingToken = IERC20(underlying);
         underlyingToken.safeTransfer(feeReceiver, collectedFees);
 
-        // Reset the totalCollectedFees
-        totalCollectedFees = 0;
+        // Reset the totalPendingFees
+        totalPendingFees = 0;
 
         emit FeeCollected(msg.sender, collectedFees, feeReceiver);
     }
 
     /**
      * @notice updateFeeReceiver updates the fee receiver address.
-     *         Only governor can update.
+     * @dev Only governor can call this function
      */
     function updateFeeReceiver(address account)
         external

@@ -79,8 +79,8 @@ contract FeeCollector {
         _vault = vault;
     }
 
-    function collectFees() public {
-        _vault.collectFees();
+    function collectPendingFees() public {
+        _vault.collectPendingFees();
     }
 }
 
@@ -410,7 +410,7 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.totalOutstandingDebt(), 40 * 1e6); // 40 USDT so far
 
         // Total collected fees should be correct
-        assertEq(vault.totalCollectedFees(), 0); // 0 USDT so far
+        assertEq(vault.totalPendingFees(), 0); // 0 USDT so far
 
         // After 5 days, then accrue interest
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
@@ -437,7 +437,7 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.totalOutstandingDebt(), 40048706 + (50 * 1e6)); // 90.04870624 USDT so far
 
         // Total collected fees should be correct
-        assertEq(vault.totalCollectedFees(), 4870); // 0.004870624049 USDT so far
+        assertEq(vault.totalPendingFees(), 4870); // 0.004870624049 USDT so far
 
         // Next 5 days again
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
@@ -536,8 +536,8 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.feeReceiver(), newReceiver);
     }
 
-    /// @notice Make sure anyone can send collected fees to fee receiver
-    function test_AnyoneCanSendCollectedFeesToFeeReceiver() public {
+    /// @notice Make sure anyone can collect pending fees to fee receiver
+    function test_AnyoneCanCollectPendingFeesToFeeReceiver() public {
         // Set governor and fee receiver
         address governor = address(this);
         address feeReceiver = hevm.addr(3);
@@ -569,18 +569,18 @@ contract RisedleVaultExternalTest is DSTest {
         // Accrue interest
         vault.accrueInterest();
 
-        // Get the toal collected fees
-        uint256 totalCollectedFees = vault.totalCollectedFees();
+        // Get the toal pending fees
+        uint256 totalPendingFees = vault.totalPendingFees();
 
         // Public collect fees
         FeeCollector collector = new FeeCollector(vault);
-        collector.collectFees();
+        collector.collectPendingFees();
 
-        // Make sure totalCollectedFees is set to zero
-        assertEq(vault.totalCollectedFees(), 0);
+        // Make sure totalPendingFees is set to zero
+        assertEq(vault.totalPendingFees(), 0);
 
-        // Make sure the fee receiver have totalCollectedFees balance
-        assertEq(USDT.balanceOf(feeReceiver), totalCollectedFees);
+        // Make sure the fee receiver have totalPendingFees balance
+        assertEq(USDT.balanceOf(feeReceiver), totalPendingFees);
     }
 
     /// @notice Test accrue interest as public
