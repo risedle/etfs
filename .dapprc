@@ -1,5 +1,0 @@
-# Set solidity version
-export DAPP_SOLC_VERSION=0.8.7
-
-# To surpress error $(dapp remappings) when using OpenZeppelin library
-export DAPP_REMAPPINGS=""

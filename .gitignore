@@ -4,4 +4,5 @@
 hevm.libs*
 
 # Ignore secret files
-.env
+.dapprc
+
