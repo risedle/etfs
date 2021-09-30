@@ -9,5 +9,6 @@
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
-  "editor.tabSize": 4
+  "editor.tabSize": 4,
+  "solidity.remappings": ["chain/=src/test/ethereum"]
 }
