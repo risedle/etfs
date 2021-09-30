@@ -9,16 +9,34 @@ This repository contains smart contract for decentralized leveraged ETFs.
 - Twitter: [@risedle](https://twitter.com/risedle)
 - Whitepaper: [ETHRISE Whitepaper](https://observablehq.com/@pyk/ethrise)
 
-## Installation
+## Install
 
 Requires [dapp.tools](https://github.com/dapphub/dapptools#installation).
 
 1. Clone Risedle
    ```
-   git clone git@github.com:risedle/etfs.git etfs
+   git clone git@github.com:risedle/etfs.git
    cd etfs/
    ```
-2.
+2. Download all the dependencies
+   ```
+   dapp update
+   ```
+3. Configure and run the test
+
+## Configure
+
+Copy `.dapprc.example` to `.dapprc` and edit the `ETH_RPC_URL`.
+
+## Run the test
+
+Run the following command to run the test against Ethereum mainnet:
+
+      CHAIN=ethereum make test
+
+Use this command to run the test against Arbitrum One mainnet:
+
+      CHAIN=arbitrum make test
 
 ### VSCode
 
