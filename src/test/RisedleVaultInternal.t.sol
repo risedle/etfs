@@ -9,13 +9,19 @@ pragma experimental ABIEncoderV2;
 import "lib/ds-test/src/test.sol";
 import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {HEVM} from "./utils/HEVM.sol";
+import {Hevm} from "./Hevm.sol";
 import {RisedleVault} from "../RisedleVault.sol";
+
+// chain/* is replaced by DAPP_REMAPPINGS at compile time,
+// this allow us to use custom address on specific chain
+// See .dapprc
+import {USDT_ADDRESS} from "chain/Constants.sol";
 
 // Set Risedle's Vault properties
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
-address constant usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+address constant vaultUnderlying = USDT_ADDRESS;
+uint8 constant vaultUnderlyingDecimals = 6;
 address constant vaultGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
 address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
@@ -24,22 +30,23 @@ contract RisedleVaultInternalTest is
     RisedleVault(
         vaultTokenName,
         vaultTokenSymbol,
-        usdtAddress,
+        vaultUnderlying,
+        vaultUnderlyingDecimals,
         vaultGovernor,
         vaultFeeReceiver
     )
 {
     /// @notice hevm utils to alter mainnet state
-    HEVM hevm;
+    Hevm hevm;
 
     function setUp() public {
-        hevm = new HEVM();
+        hevm = new Hevm();
     }
 
     /// @notice Make sure all important variables are correctly set after deployment
     function test_VaultProperties() public {
         // Make sure underlying asset is correct
-        assertEq(underlying, usdtAddress);
+        assertEq(underlying, vaultUnderlying);
 
         // Make sure the governor address is correct
         assertEq(governor, vaultGovernor);

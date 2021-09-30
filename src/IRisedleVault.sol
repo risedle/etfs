@@ -60,6 +60,9 @@ interface IRisedleVault {
     /// @notice isBorrower returns true if account is borrower
     function isBorrower(address account) external view returns (bool);
 
+    /// @notice getTotalAvailableCash returns the total cash available to borrow
+    function getTotalAvailableCash() external view returns (uint256);
+
     /// @notice getUtilizationRateInEther returns current utilization rate in ether units
     function getUtilizationRateInEther(address account)
         external

@@ -6,23 +6,25 @@
 import "lib/ds-test/src/test.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import {HEVM} from "./utils/HEVM.sol";
+// chain/* is replaced by DAPP_REMAPPINGS at compile time,
+// this allow us to use custom address on specific chain
+// See .dapprc
+import {WETH_ADDRESS, USDT_ADDRESS} from "chain/Constants.sol";
+
+import {Hevm} from "./Hevm.sol";
 import {RisedleVault} from "../RisedleVault.sol";
 import {RisedleETF} from "../RisedleETF.sol";
 
 contract RisedleETFExternalTest is DSTest {
-    address constant USDT_ADDRESS = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     IERC20 constant USDT = IERC20(USDT_ADDRESS);
-
-    address constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IERC20 constant WETH = IERC20(WETH_ADDRESS);
 
     // HEVM
-    HEVM hevm;
+    Hevm hevm;
 
     /// @notice Run the test setup
     function setUp() public {
-        hevm = new HEVM();
+        hevm = new Hevm();
     }
 
     /// @notice Utility function to create new vault
@@ -35,6 +37,7 @@ contract RisedleETFExternalTest is DSTest {
             "Risedle USDT Vault",
             "rvUSDT",
             USDT_ADDRESS,
+            6,
             governor,
             feeReceiver
         );

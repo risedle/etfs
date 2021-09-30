@@ -9,14 +9,19 @@ pragma experimental ABIEncoderV2;
 import "lib/ds-test/src/test.sol";
 import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {HEVM} from "./utils/HEVM.sol";
+// chain/* is replaced by DAPP_REMAPPINGS at compile time,
+// this allow us to use custom address on specific chain
+// See .dapprc
+import {WETH_ADDRESS, USDT_ADDRESS} from "chain/Constants.sol";
+
+import {Hevm} from "./Hevm.sol";
 import {RisedleVault} from "../RisedleVault.sol";
 import {RisedleETF} from "../RisedleETF.sol";
 
 // Set Risedle ETF's properties
 string constant etfTokenName = "ETH 2x Leverage Risedle";
 string constant etfTokenSymbol = "ETHRISE";
-address constant wethAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+address constant wethAddress = WETH_ADDRESS;
 address constant etfGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
 address constant etfFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
@@ -24,7 +29,7 @@ uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
 // Set Risedle's Vault properties
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
-address constant usdtAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+address constant usdtAddress = USDT_ADDRESS;
 address constant vaultGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
 address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
@@ -40,19 +45,20 @@ contract RisedleETFInternalTest is
     )
 {
     /// @notice hevm utils to alter mainnet state
-    HEVM hevm;
+    Hevm hevm;
 
     RisedleVault etfVault;
 
     function setUp() public {
         // Initialize HEVM
-        hevm = new HEVM();
+        hevm = new Hevm();
 
         // Create new Risedle Vault
         etfVault = new RisedleVault(
             vaultTokenName,
             vaultTokenSymbol,
             usdtAddress,
+            6,
             vaultGovernor,
             vaultFeeReceiver
         );

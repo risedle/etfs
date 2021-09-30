@@ -17,7 +17,6 @@ pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
@@ -143,6 +142,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @param name The Vault's token name
      * @param symbol The Vault's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
+     * @param underlyingDecimals_ The ERC20 decimals of underlying asset
      * @param governor_ The Vault's governor address
      * @param feeReceiver_ The Vault's fee receiver address
      */
@@ -150,6 +150,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         string memory name,
         string memory symbol,
         address underlying_,
+        uint8 underlyingDecimals_,
         address governor_,
         address feeReceiver_
     ) ERC20(name, symbol) {
@@ -160,7 +161,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         underlying = underlying_;
 
         // Set vault token decimals similar to the underlying
-        _decimals = IERC20Metadata(underlying_).decimals();
+        _decimals = underlyingDecimals_;
 
         // Setup governor role
         governor = governor_;
@@ -211,7 +212,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      *         that available to borrow
      * @return The amount of underlying asset ready to borrow
      */
-    function getTotalAvailableCash() internal view returns (uint256) {
+    function getTotalAvailableCash() public view returns (uint256) {
         IERC20 underlyingToken = IERC20(underlying);
         uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
         if (totalPendingFees >= underlyingBalance) return 0;
