@@ -38,6 +38,52 @@ Use this command to run the test against Arbitrum One mainnet:
 
       CHAIN=arbitrum make test
 
+here is the example output:
+
+      Running 3 tests for src/test/Hevm.t.sol:HevmTest
+      [PASS] test_setUSDTBalance() (gas: 13698)
+      [PASS] test_setWETHBalance() (gas: 11267)
+      [PASS] test_setUSDCBalance() (gas: 18526)
+
+      Running 4 tests for src/test/RisedleETFExternal.t.sol:RisedleETFExternalTest
+      [PASS] test_SetVaultAfterDeployment() (gas: 6107018)
+      [PASS] test_GovernorCanUpdateFreeReceiver() (gas: 6111789)
+      [PASS] testFail_NonGovernorCannotUpdateFeeReceiver() (gas: 6148497)
+      [PASS] testFail_SetVaultOnlyCalledOnce() (gas: 6107293)
+
+      Running 1 tests for src/test/RisedleETFInternal.t.sol:RisedleETFInternalTest
+      [PASS] test_ETFProperties() (gas: 13426)
+
+      Running 17 tests for src/test/RisedleVaultExternal.t.sol:RisedleVaultExternalTest
+      [PASS] test_LenderCanRemoveSupplyFromTheVault() (gas: 4833261)
+      [PASS] test_GovernorCanUpdateVaultParameters() (gas: 3944778)
+      [PASS] test_LenderShouldEarnInterest() (gas: 5578959)
+      [PASS] test_GovernorCanUpdateFeeReceiverAddress() (gas: 3939985)
+      [PASS] test_AuthorizedBorrowerCanRepayToTheVault() (gas: 5587454)
+      [PASS] test_LenderCanAddSupplytToTheVault() (gas: 4759698)
+      [PASS] test_AnyoneCanCollectPendingFeesToFeeReceiver() (gas: 5713409)
+      [PASS] test_GovernorIsProperlySet() (gas: 3945107)
+      [PASS] test_BorrowersDebtShouldIncreasedProportionally() (gas: 6361578)
+      [PASS] testFail_NonGovernorCannotUpdateFeeReceiverAddress() (gas: 3977944)
+      [PASS] testFail_NonGovernorCannotUpdateVaultParameters() (gas: 3976614)
+      [PASS] test_GovernorCanGrantBorrower() (gas: 4615699)
+      [PASS] test_AuthorizedBorrowerCanBorrowFromTheVault() (gas: 5541331)
+      [PASS] testFail_UnauthorizedBorrowerCannotBorrowFromTheVault() (gas: 5445309)
+      [PASS] testFail_UnauthorizedBorrowerCannotRepayToTheVault() (gas: 4655713)
+      [PASS] test_LendersShouldEarnInterestProportionally() (gas: 6414942)
+      [PASS] test_AnyoneCanAccrueInterest() (gas: 3961500)
+
+      Running 9 tests for src/test/RisedleVaultInternal.t.sol:RisedleVaultInternalTest
+      [PASS] test_GetDebtProportionRateInEther() (gas: 48305)
+      [PASS] test_GetTotalAvailableCash() (gas: 44068)
+      [PASS] test_VaultProperties() (gas: 20518)
+      [PASS] test_GetUtilizationRateInEther() (gas: 3098)
+      [PASS] test_GetBorrowRatePerSecondInEther() (gas: 11508)
+      [PASS] test_GetExchangeRateInEther() (gas: 165111)
+      [PASS] test_UpdateVaultStates() (gas: 49928)
+      [PASS] test_AccrueInterest() (gas: 103581)
+      [PASS] test_GetInterestAmount() (gas: 2467)
+
 ### VSCode
 
 Install the following VSCode extension:
