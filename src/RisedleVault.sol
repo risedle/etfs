@@ -394,19 +394,13 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         );
     }
 
-    /// @notice getVaultTokenSupply returns the total supply of the vault token
-    function getVaultTokenTotalSupply() internal view returns (uint256) {
-        IERC20 vaultToken = IERC20(address(this));
-        return vaultToken.totalSupply();
-    }
-
     /**
      * @notice getExchangeRateInEther get the current exchange rate of vault token
      *         in term of underlying asset.
      * @return The exchange rates in ether units
      */
     function getExchangeRateInEther() internal view returns (uint256) {
-        uint256 totalSupply = getVaultTokenTotalSupply();
+        uint256 totalSupply = totalSupply();
 
         if (totalSupply == 0) {
             // If there is no supply, exchange rate is 1:1
@@ -530,18 +524,6 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getDebtProportion returns the current debt proportion of the borrower
-     * @param account The borrower address
-     */
-    function getDebtProportion(address account)
-        external
-        view
-        returns (uint256)
-    {
-        return _debtProportion[account];
-    }
-
-    /**
      * @notice Borrower borrow asset from the vault
      * @dev Only authorized borrowers are allowed to borrow
      * @param amount The amount of underlying asset to borrow
@@ -610,6 +592,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
      */
     function getVaultParameters()
         external
+        view
         returns (
             uint256,
             uint256,

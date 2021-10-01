@@ -78,7 +78,7 @@ contract RisedleVaultInternalTest is
         assertEq(vaultTokenMetadata.decimals(), 6); // Equal to USDT decimals
 
         // Make sure the total supply is set to zero
-        assertEq(getVaultTokenTotalSupply(), 0);
+        assertEq(totalSupply(), 0);
     }
 
     /// @notice Make sure getTotalAvailableCash return correctly
