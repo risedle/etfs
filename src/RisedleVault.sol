@@ -26,7 +26,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice Only valid borrower can borrow and repay underlying assets
-    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
+    bytes32 private constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
     /// @notice The underlying assets address contract (ERC20)
     address public immutable underlying;
