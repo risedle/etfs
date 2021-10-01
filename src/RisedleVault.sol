@@ -71,7 +71,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     uint256 public totalPendingFees;
 
     /// @notice Timestamp that interest was last accrued at
-    uint256 public lastTimestampInterestAccrued;
+    uint256 internal lastTimestampInterestAccrued;
 
     /// @notice Event emitted when the interest succesfully accrued
     event InterestAccrued(
