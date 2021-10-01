@@ -47,22 +47,22 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     mapping(address => uint256) private _debtProportion;
 
     /// @notice Optimal utilization rate in ether units
-    uint256 public OPTIMAL_UTILIZATION_RATE_IN_ETHER;
+    uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER;
 
     /// @notice Interest slope 1 in ether units
-    uint256 public INTEREST_SLOPE_1_IN_ETHER;
+    uint256 internal INTEREST_SLOPE_1_IN_ETHER;
 
     /// @notice Interest slop 2 in ether units
-    uint256 public INTEREST_SLOPE_2_IN_ETHER;
+    uint256 internal INTEREST_SLOPE_2_IN_ETHER;
 
     /// @notice Number of seconds in a year (approximation)
-    uint256 public immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
+    uint256 internal immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
 
     /// @notice Maximum borrow rate per second in ether units
-    uint256 public MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
+    uint256 internal MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
 
     /// @notice Performance fee for the lender
-    uint256 public PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
+    uint256 internal PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
 
     /// @notice The total amount of principal borrowed plus interest accrued
     uint256 public totalOutstandingDebt;
@@ -608,6 +608,29 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Emit event
         emit Repaid(msg.sender, amount, debtProportionRateInEther);
+    }
+
+    /**
+     * @notice getVaultParameters returns the current vault parameters.
+     * @return All vault parameters
+     */
+    function getVaultParameters()
+        external
+        returns (
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        )
+    {
+        return (
+            OPTIMAL_UTILIZATION_RATE_IN_ETHER,
+            INTEREST_SLOPE_1_IN_ETHER,
+            INTEREST_SLOPE_2_IN_ETHER,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER,
+            PERFORMANCE_FEE_IN_ETHER
+        );
     }
 
     /**

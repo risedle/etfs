@@ -238,17 +238,14 @@ contract RisedleVaultAccessControlTest is DSTest {
         );
 
         // Make sure the parameters is updated
-        assertEq(
-            vault.OPTIMAL_UTILIZATION_RATE_IN_ETHER(),
-            optimalUtilizationRate
-        );
-        assertEq(vault.INTEREST_SLOPE_1_IN_ETHER(), slope1);
-        assertEq(vault.INTEREST_SLOPE_2_IN_ETHER(), slope2);
-        assertEq(
-            vault.MAX_BORROW_RATE_PER_SECOND_IN_ETHER(),
-            maxBorrowRatePerSeconds
-        );
-        assertEq(vault.PERFORMANCE_FEE_IN_ETHER(), fee);
+        (uint256 u, uint256 s1, uint256 s2, uint256 mr, uint256 f) = vault
+            .getVaultParameters();
+
+        assertEq(u, optimalUtilizationRate);
+        assertEq(s1, slope1);
+        assertEq(s2, slope2);
+        assertEq(mr, maxBorrowRatePerSeconds);
+        assertEq(f, fee);
     }
 
     /// @notice Make sure non-governor account cannot change the fee receiver
