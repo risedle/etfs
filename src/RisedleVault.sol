@@ -40,7 +40,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice The total debt proportion issued by the vault, the usage is
     ///         similar to the vault token supply. In order to track the
     ///         outstanding debt of the borrower
-    uint256 public totalDebtProportion;
+    uint256 internal totalDebtProportion;
 
     /// @notice Mapping borrower to their debt proportion of totalOutstandingDebt
     /// @dev debt = _debtProportion[borrower] * debtProportionRate
