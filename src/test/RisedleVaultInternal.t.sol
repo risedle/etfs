@@ -22,8 +22,6 @@ string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
 address constant vaultUnderlying = USDT_ADDRESS;
 uint8 constant vaultUnderlyingDecimals = 6;
-address constant vaultGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
-address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
 contract RisedleVaultInternalTest is
     DSTest,
@@ -31,9 +29,7 @@ contract RisedleVaultInternalTest is
         vaultTokenName,
         vaultTokenSymbol,
         vaultUnderlying,
-        vaultUnderlyingDecimals,
-        vaultGovernor,
-        vaultFeeReceiver
+        vaultUnderlyingDecimals
     )
 {
     /// @notice hevm utils to alter mainnet state
@@ -47,12 +43,6 @@ contract RisedleVaultInternalTest is
     function test_VaultProperties() public {
         // Make sure underlying asset is correct
         assertEq(underlying, vaultUnderlying);
-
-        // Make sure the governor address is correct
-        assertEq(governor, vaultGovernor);
-
-        // Make sure the fee receiver is correct
-        assertEq(feeReceiver, vaultFeeReceiver);
 
         // Make sure total outstanding debt is zero
         assertEq(totalOutstandingDebt, 0);
@@ -259,33 +249,41 @@ contract RisedleVaultInternalTest is
         assertEq(interestAmount, 213089802105600000); // in 1e6 precision or 213B USDT
     }
 
-    /// @notice Make sure updateVaultStates update the vault states correctly
-    function test_UpdateVaultStates() public {
+    /// @notice Make sure setVaultStates update the vault states correctly
+    function test_setVaultStates() public {
         // interestAmount=0
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalPendingFees = 5 * 1e6; // 5 USDT
-        updateVaultStates(0);
+        lastTimestampInterestAccrued = 0;
+        setVaultStates(0, 0);
         assertEq(totalOutstandingDebt, 100 * 1e6);
         assertEq(totalPendingFees, 5 * 1e6);
+        assertEq(lastTimestampInterestAccrued, 0);
 
         // interestAmount=10 USDT
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalPendingFees = 5 * 1e6; // 5 USDT
-        updateVaultStates(10 * 1e6); // 10 USDT
+        lastTimestampInterestAccrued = 10;
+        setVaultStates(10 * 1e6, 12); // 10 USDT
         // The totalOutstandingDebt & totalPendingFees should be updated
         assertEq(totalOutstandingDebt, 110000000); // 110 USDT
         assertEq(totalPendingFees, 6000000); // 6 USDT
+        assertEq(lastTimestampInterestAccrued, 12);
 
         // Test with very large numbers
         totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
         totalPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT
-        updateVaultStates(10 * 1e12 * 1e6); // 10 trillion USDT
+        lastTimestampInterestAccrued = 100;
+        setVaultStates(10 * 1e12 * 1e6, 200); // 10 trillion USDT
         assertEq(totalOutstandingDebt, 110 * 1e12 * 1e6); // 110 trillion USDT
         assertEq(totalPendingFees, 2 * 1e12 * 1e6); // 2 trillion USDT
+        assertEq(lastTimestampInterestAccrued, 200);
     }
 
     /// @notice Make sure accrue interest is working perfectly
     function test_AccrueInterest() public {
+        uint256 nextTimestamp;
+
         // Scenario 1: 0% utilization
         totalOutstandingDebt = 0;
         totalPendingFees = 0;
@@ -301,39 +299,45 @@ contract RisedleVaultInternalTest is
         totalPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 24);
         // Set block timestamp to 24 hours later
-        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 24));
+        hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalPendingFees are updated
         assertEq(totalOutstandingDebt, 100046832); // 100 + (100% of interest amount)
         assertEq(totalPendingFees, 20004683); // 20 + (10% of interest amount)
+        assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
 
         // Scenario 3: Above optimzal utilization rate
         totalOutstandingDebt = 400 * 1e6; // 400 USDT
         totalPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 3);
         // Set block timestamp to 3 hours later
-        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 3));
+        hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalPendingFees are updated
         assertEq(totalOutstandingDebt, 400063013); // 400 + (100% of interest amount)
         assertEq(totalPendingFees, 20006301); // 20 + (10% of interest amount)
+        assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
 
         // Scenario 4: Maximum utilization rate
         totalOutstandingDebt = 15000 * 1e6; // 15000 USDT
         totalPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
+        nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 10);
         // Set block timestamp to 10 hours later
-        hevm.warp(lastTimestampInterestAccrued + (60 * 60 * 10));
+        hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
         // Make sure the totalOutstandingDebt and totalPendingFees are updated
         assertEq(totalOutstandingDebt, 15027397260); // 400 + (100% of interest amount)
         assertEq(totalPendingFees, 22739726); // 20 + (10% of interest amount)
+        assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
     }
 
     /// @notice Make sure the getExchangeRateInEther() working perfectly

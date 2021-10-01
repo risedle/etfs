@@ -30,8 +30,6 @@ uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
 address constant usdtAddress = USDT_ADDRESS;
-address constant vaultGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
-address constant vaultFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 
 contract RisedleETFInternalTest is
     DSTest,
@@ -58,9 +56,7 @@ contract RisedleETFInternalTest is
             vaultTokenName,
             vaultTokenSymbol,
             usdtAddress,
-            6,
-            vaultGovernor,
-            vaultFeeReceiver
+            6
         );
 
         // Set the vault

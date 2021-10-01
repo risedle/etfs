@@ -18,30 +18,24 @@ pragma experimental ABIEncoderV2;
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 /// @title Risedle's Vault
-contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
+contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @notice Only valid borrower can borrow and repay underlying assets
-    bytes32 private constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
+    /// @notice To keep track the authorized borrower
+    mapping(address => bool) private _isBorrower;
 
     /// @notice The underlying assets address contract (ERC20)
     address public immutable underlying;
 
-    /// @notice The Vault's governor address
-    address public governor;
-
     /// @notice The Vault's fee receiver address
-    address public feeReceiver;
+    address internal feeReceiver;
 
     /// @notice The vault token decimals
     uint8 private immutable _decimals;
-
-    /// @notice The total amount of principal borrowed plus interest accrued
-    uint256 public totalOutstandingDebt;
 
     /// @notice The total debt proportion issued by the vault, the usage is
     ///         similar to the vault token supply. In order to track the
@@ -51,9 +45,6 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     /// @notice Mapping borrower to their debt proportion of totalOutstandingDebt
     /// @dev debt = _debtProportion[borrower] * debtProportionRate
     mapping(address => uint256) private _debtProportion;
-
-    /// @notice The total amount of pending fees to be collected in the vault
-    uint256 public totalPendingFees;
 
     /// @notice Optimal utilization rate in ether units
     uint256 public OPTIMAL_UTILIZATION_RATE_IN_ETHER;
@@ -72,6 +63,12 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
     /// @notice Performance fee for the lender
     uint256 public PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
+
+    /// @notice The total amount of principal borrowed plus interest accrued
+    uint256 public totalOutstandingDebt;
+
+    /// @notice The total amount of pending fees to be collected in the vault
+    uint256 public totalPendingFees;
 
     /// @notice Timestamp that interest was last accrued at
     uint256 public lastTimestampInterestAccrued;
@@ -143,16 +140,12 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @param symbol The Vault's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
      * @param underlyingDecimals_ The ERC20 decimals of underlying asset
-     * @param governor_ The Vault's governor address
-     * @param feeReceiver_ The Vault's fee receiver address
      */
     constructor(
         string memory name,
         string memory symbol,
         address underlying_,
-        uint8 underlyingDecimals_,
-        address governor_,
-        address feeReceiver_
+        uint8 underlyingDecimals_
     ) ERC20(name, symbol) {
         // Sanity check
         IERC20(underlying_).totalSupply();
@@ -163,12 +156,8 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Set vault token decimals similar to the underlying
         _decimals = underlyingDecimals_;
 
-        // Setup governor role
-        governor = governor_;
-        _setupRole(DEFAULT_ADMIN_ROLE, governor_);
-
-        // Set fee receiver address
-        feeReceiver = feeReceiver_;
+        // Set contract deployer as fee receiver address
+        feeReceiver = msg.sender;
 
         // Initialize the last timestamp accrued
         lastTimestampInterestAccrued = block.timestamp;
@@ -187,15 +176,21 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice grantAsBorrower grants account to borrow the underlying asset
+     * @notice onlyBorrower modifier
+     * @dev Use this for borrow and repay function
+     */
+    modifier onlyBorrower() {
+        require(_isBorrower[msg.sender]);
+        _;
+    }
+
+    /**
+     * @notice setAsBorrower grants account to borrow the underlying asset
      * @dev Only governor can call this function
      * @param account The contract address granted to borrow
      */
-    function grantAsBorrower(address account)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        _setupRole(BORROWER_ROLE, account);
+    function setAsBorrower(address account) external onlyOwner {
+        _isBorrower[account] = true;
     }
 
     /**
@@ -204,7 +199,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @return True if account have been granted as borrower
      */
     function isBorrower(address account) external view returns (bool) {
-        return hasRole(BORROWER_ROLE, account);
+        return _isBorrower[account];
     }
 
     /**
@@ -326,11 +321,14 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice updateVaultStates update the totalOutstandingDebt and totalPendingFees
+     * @notice setVaultStates update the totalOutstandingDebt and totalPendingFees
      * @param interestAmount The total of interest amount to be splitted, the decimals
      *        is similar to totalOutstandingDebt and totalPendingFees.
+     * @param currentTimestamp The current timestamp when the interest is accrued
      */
-    function updateVaultStates(uint256 interestAmount) internal {
+    function setVaultStates(uint256 interestAmount, uint256 currentTimestamp)
+        internal
+    {
         // Get the fee
         uint256 feeAmount = (PERFORMANCE_FEE_IN_ETHER * interestAmount) /
             1 ether;
@@ -338,6 +336,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
         // Update the states
         totalOutstandingDebt = totalOutstandingDebt + interestAmount;
         totalPendingFees = totalPendingFees + feeAmount;
+        lastTimestampInterestAccrued = currentTimestamp;
     }
 
     /**
@@ -383,10 +382,9 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
 
         // Update the vault states based on the interest amount:
         // totalOutstandingDebt & totalPendingFees
-        updateVaultStates(interestAmount);
+        setVaultStates(interestAmount, currentTimestamp);
 
-        // Otherwise set the timestamp last accrued and emit event
-        lastTimestampInterestAccrued = currentTimestamp;
+        // Emit the event
         emit InterestAccrued(
             previousTimestamp,
             currentTimestamp,
@@ -554,11 +552,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @dev Only authorized borrowers are allowed to borrow
      * @param amount The amount of underlying asset to borrow
      */
-    function borrow(uint256 amount)
-        external
-        nonReentrant
-        onlyRole(BORROWER_ROLE)
-    {
+    function borrow(uint256 amount) external nonReentrant onlyBorrower {
         // Accrue interest
         accrueInterest();
 
@@ -589,11 +583,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @dev Only authotized borrowers are allowed to repay
      * @param amount The amount of underlying asset to repay
      */
-    function repay(uint256 amount)
-        external
-        nonReentrant
-        onlyRole(BORROWER_ROLE)
-    {
+    function repay(uint256 amount) external nonReentrant onlyBorrower {
         // Accrue interest
         accrueInterest();
 
@@ -621,7 +611,7 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice updateVaultParameters updates the vault parameters.
+     * @notice setVaultParameters updates the vault parameters.
      * @dev Only governor can call this function
      * @param u The optimal utilization rate in ether units
      * @param s1 The interest slope 1 in ether units
@@ -629,13 +619,13 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
      * @param mr The maximum borrow rate per second in ether units
      * @param fee The performance sharing fee for the lender in ether units
      */
-    function updateVaultParameters(
+    function setVaultParameters(
         uint256 u,
         uint256 s1,
         uint256 s2,
         uint256 mr,
         uint256 fee
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyOwner {
         // Update vault parameters
         OPTIMAL_UTILIZATION_RATE_IN_ETHER = u;
         INTEREST_SLOPE_1_IN_ETHER = s1;
@@ -668,13 +658,10 @@ contract RisedleVault is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice updateFeeReceiver updates the fee receiver address.
+     * @notice setFeeReceiver sets the fee receiver address.
      * @dev Only governor can call this function
      */
-    function updateFeeReceiver(address account)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setFeeReceiver(address account) external onlyOwner {
         feeReceiver = account;
 
         emit FeeReceiverUpdated(msg.sender, account);

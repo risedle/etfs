@@ -15,11 +15,12 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 import "./IRisedleVault.sol";
 
 /// @title Risedle ETF
-contract RisedleETF is ERC20, AccessControl {
+contract RisedleETF is ERC20, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice The underlying assets address contract (ERC20)
@@ -116,5 +117,26 @@ contract RisedleETF is ERC20, AccessControl {
         feeReceiver = account;
 
         emit FeeReceiverUpdated(msg.sender, account);
+    }
+
+    /**
+     * @notice getAvailableCashToBorrow gets available cash from the vault
+     * @return The amount of cash available to borrow
+     */
+    function getAvailableCashToBorrow() internal returns (uint256) {
+        // IRisedleVault vault = IRisedleVault(adddress(vault));
+        // return vault.getTotalAvailableCash();
+    }
+
+    /**
+     * @notice Investors supplies underlying assets into the ETF and receives
+     *         ETF tokens in exchange
+     * @param amount The amount of the underlying asset to supply
+     */
+    function mint(uint256 amount) external nonReentrant {
+        // Get amount of cash that we can borrow from the vault
+        // uint256 vaultCash = getAvailableCashToBorrow();
+        // Get the current price of ETF's underlying asset in term of Vault's underlying asset
+        // TODO: how?
     }
 }

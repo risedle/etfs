@@ -28,18 +28,13 @@ contract RisedleETFExternalTest is DSTest {
     }
 
     /// @notice Utility function to create new vault
-    function createNewVault(address governor, address feeReceiver)
-        internal
-        returns (RisedleVault)
-    {
+    function createNewVault() internal returns (RisedleVault) {
         // Create new vault
         RisedleVault vault = new RisedleVault(
             "Risedle USDT Vault",
             "rvUSDT",
             USDT_ADDRESS,
-            6,
-            governor,
-            feeReceiver
+            6
         );
         return vault;
     }
@@ -69,7 +64,7 @@ contract RisedleETFExternalTest is DSTest {
         address feeReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(governor, feeReceiver);
+        RisedleVault vault = createNewVault();
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
@@ -89,7 +84,9 @@ contract RisedleETFExternalTest is DSTest {
         address feeReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(governor, feeReceiver);
+        RisedleVault vault = createNewVault();
+        vault.transferOwnership(governor);
+        vault.setFeeReceiver(feeReceiver);
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
@@ -109,7 +106,9 @@ contract RisedleETFExternalTest is DSTest {
         address feeReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(governor, feeReceiver);
+        RisedleVault vault = createNewVault();
+        vault.transferOwnership(governor);
+        vault.setFeeReceiver(feeReceiver);
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
@@ -128,7 +127,9 @@ contract RisedleETFExternalTest is DSTest {
         address feeReceiver = hevm.addr(2);
 
         // Create new vault
-        RisedleVault vault = createNewVault(governor, feeReceiver);
+        RisedleVault vault = createNewVault();
+        vault.transferOwnership(governor);
+        vault.setFeeReceiver(feeReceiver);
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
