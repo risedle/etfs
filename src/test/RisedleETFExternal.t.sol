@@ -2,6 +2,8 @@
 
 // Risedle's ETF External Test
 // Test & validate user/contract interaction with Risedle's ETF
+pragma solidity ^0.8.7;
+pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
