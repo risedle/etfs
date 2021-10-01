@@ -18,3 +18,5 @@ gas:
 	./scripts/risedle-vault-gas-with-build-optimization.sh
 	./scripts/risedle-vault-gas-without-build-optimization.sh
 
+gas-report:
+	dapp test --rpc -v -m GasReport
