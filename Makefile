@@ -1,7 +1,3 @@
-# include .env file and export its env vars
-# (-include to ignore error if it does not exist)
-
-
 all:
 	dapp build
 
@@ -16,4 +12,9 @@ test-only:
 
 prove:
 	dapp test -v -m prove
+
+# Report gas usage
+gas:
+	./scripts/risedle-vault-gas-with-build-optimization.sh
+	./scripts/risedle-vault-gas-without-build-optimization.sh
 
