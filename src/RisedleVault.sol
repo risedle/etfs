@@ -47,13 +47,13 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     mapping(address => uint256) private _debtProportion;
 
     /// @notice Optimal utilization rate in ether units
-    uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER;
+    uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
 
     /// @notice Interest slope 1 in ether units
-    uint256 internal INTEREST_SLOPE_1_IN_ETHER;
+    uint256 internal INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
 
     /// @notice Interest slop 2 in ether units
-    uint256 internal INTEREST_SLOPE_2_IN_ETHER;
+    uint256 internal INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
 
     /// @notice Number of seconds in a year (approximation)
     uint256 internal immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
@@ -161,12 +161,6 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Initialize the last timestamp accrued
         lastTimestampInterestAccrued = block.timestamp;
-
-        // Set initial interest rate model parameters
-        // See visualization here: https://observablehq.com/@pyk/ethrise
-        OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
-        INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
-        INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
     }
 
     /// @notice Overwrite the vault token decimals
