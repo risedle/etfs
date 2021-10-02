@@ -84,6 +84,28 @@ here is the example output:
       [PASS] test_AccrueInterest() (gas: 103581)
       [PASS] test_GetInterestAmount() (gas: 2467)
 
+## Gas Report
+
+Run the following command to get deployment gas report:
+
+      export ETH_RPC_URL=<rpc url here>
+      make gas
+
+Here is the example output:
+
+      ./scripts/risedle-vault-gas-with-build-optimization.sh
+      Risedle Vault with DAPP_BUILD_OPTIMIZE=1
+      Deployment gas usage: 2513337
+      ./scripts/risedle-vault-gas-without-build-optimization.sh
+      Risedle Vault with DAPP_BUILD_OPTIMIZE=0
+      Deployment gas usage: 3644718
+      ./scripts/risedle-etf-gas-with-build-optimization.sh
+      Risedle ETF with DAPP_BUILD_OPTIMIZE=1
+      Deployment gas usage: 1137986
+      ./scripts/risedle-etf-gas-without-build-optimization.sh
+      Risedle ETF with DAPP_BUILD_OPTIMIZE=0
+      Deployment gas usage: 1761578
+
 ### VSCode
 
 Install the following VSCode extension:
