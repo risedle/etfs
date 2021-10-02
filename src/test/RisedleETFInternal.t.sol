@@ -79,6 +79,9 @@ contract RisedleETFInternalTest is
         // Make sure the initial price is correct
         assertEq(INITIAL_ETF_PRICE, etfInitialPrice);
 
+        // Make sure the fee is correct
+        assertEq(FEE_IN_ETHER, 0.001 ether); // 0.1%
+
         // Make sure the ETF's token properties is correct
         IERC20Metadata etfTokenMetadata = IERC20Metadata(address(this));
         assertEq(etfTokenMetadata.name(), etfTokenName);
@@ -87,5 +90,24 @@ contract RisedleETFInternalTest is
 
         // Make sure the total supply is set to zero
         assertEq(totalSupply(), 0);
+    }
+
+    /// @notice Make sure the principal and fee amount is setup correctly
+    function test_GetPrincipalAndFeeAmount() public {
+        uint256 amount;
+        uint256 principalAmount;
+        uint256 feeAmount;
+
+        // Test with normal number
+        amount = 1 ether;
+        (principalAmount, feeAmount) = getPrincipalAndFeeAmount(amount);
+        assertEq(principalAmount, 0.999 ether);
+        assertEq(feeAmount, 0.001 ether);
+
+        // Test with very large number
+        amount = 1000 * 1e12 * 1e18; // 1000 trillion WETH
+        (principalAmount, feeAmount) = getPrincipalAndFeeAmount(amount);
+        assertEq(principalAmount, 999 * 1e12 * 1e18);
+        assertEq(feeAmount, 1 * 1e12 * 1e18);
     }
 }
