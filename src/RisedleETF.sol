@@ -42,6 +42,10 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     /// @notice The ETF's creation and redemption fee in ether units
     uint256 internal FEE_IN_ETHER = 0.001 ether; // 0.1% creation and redemption fee
 
+    /// @notice The ETF's pending fees
+    uint256 internal totalPendingCreationFees;
+    uint256 internal totalPendingRedemptionFees;
+
     /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
 
@@ -127,6 +131,34 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
         feeReceiver = account;
 
         emit FeeReceiverUpdated(msg.sender, account);
+    }
+
+    /**
+     * @notice setFee updates the creation and redemption fees
+     * @dev Only governor can update the creation and redemption fees
+     * @param fee Fee in ether units (e.g. 0.1% is 0.001 ether)
+     */
+    function setFee(uint256 fee) external onlyOwner {
+        FEE_IN_ETHER = fee;
+    }
+
+    /**
+     * @notice getFees returns current fees in ether units,
+     *         totalPendingCreationFees and totalPendingRedemptionFees
+     * @dev We use this function to save gas
+     */
+    function getFees()
+        external
+        view
+        returns (
+            uint256 feeInEther_,
+            uint256 totalPendingCreationFees_,
+            uint256 totalPendingRedemptionFees_
+        )
+    {
+        feeInEther_ = FEE_IN_ETHER;
+        totalPendingCreationFees_ = totalPendingCreationFees;
+        totalPendingRedemptionFees_ = totalPendingRedemptionFees;
     }
 
     /**
