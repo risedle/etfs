@@ -15,6 +15,7 @@ prove:
 
 # Report gas usage
 gas:
+	./scripts/empty-gas-with-build-optimization.sh
 	./scripts/risedle-vault-gas-with-build-optimization.sh
 	./scripts/risedle-vault-gas-without-build-optimization.sh
 	./scripts/risedle-etf-gas-with-build-optimization.sh
