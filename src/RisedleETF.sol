@@ -14,33 +14,30 @@ pragma experimental ABIEncoderV2;
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 import "./IRisedleVault.sol";
 
 /// @title Risedle ETF
-contract RisedleETF is ERC20, AccessControl, ReentrancyGuard {
+contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice The underlying assets address contract (ERC20)
-    address public immutable underlying;
-
-    /// @notice The ETF's governor address
-    address public governor;
+    address internal immutable underlying;
 
     /// @notice The ETF's fee receiver address
-    address public feeReceiver;
+    address internal feeReceiver;
 
     /// @notice The Risedle Vault address
-    address public vault;
+    address internal vault;
 
     /// @notice To make sure that setupVault only run once
-    bool private vaultAdded;
+    bool internal vaultAdded;
 
     /// @notice The ETF's initial price in term of vault's underlying address
     /// @dev For example 100 USDT would be 100 * 1e6, coz USDT have 6 decimals
-    uint256 public immutable INITIAL_ETF_PRICE;
+    uint256 internal immutable INITIAL_ETF_PRICE;
 
     /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
@@ -53,7 +50,6 @@ contract RisedleETF is ERC20, AccessControl, ReentrancyGuard {
      * @param name The ETF's name
      * @param symbol The ETF's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
-     * @param governor_ The account address that govern the ETF
      * @param feeReceiver_ The account address that receive the ETF fee
      * @param initialETFPrice The initial ETF price in term of vault's underlying asset
      */
@@ -61,19 +57,11 @@ contract RisedleETF is ERC20, AccessControl, ReentrancyGuard {
         string memory name,
         string memory symbol,
         address underlying_,
-        address governor_,
         address feeReceiver_,
         uint256 initialETFPrice
     ) ERC20(name, symbol) {
-        // Sanity checks
-        IERC20(underlying_).totalSupply();
-
         // Set the underlying ETF's asset
         underlying = underlying_;
-
-        // Set the governor role
-        governor = governor_;
-        _setupRole(DEFAULT_ADMIN_ROLE, governor_);
 
         // Set the fee receiver address
         feeReceiver = feeReceiver_;
@@ -86,34 +74,53 @@ contract RisedleETF is ERC20, AccessControl, ReentrancyGuard {
     }
 
     /**
+     * @notice getETFInformation returns information about the ETF
+     * @dev Returns all public info in one function so we can save gas
+     * @return underlying_ Address of the underlying asset
+     * @return feeReceiver_ Address of the fee receiver
+     * @return vault_ Address of the vault
+     * @return vaultAdded_ True if the ETF vaule has beed added
+     * @return initialPrice_ Initial price of the ETF
+     */
+    function getETFInformation()
+        external
+        view
+        returns (
+            address underlying_,
+            address feeReceiver_,
+            address vault_,
+            bool vaultAdded_,
+            uint256 initialPrice_
+        )
+    {
+        underlying_ = underlying;
+        feeReceiver_ = feeReceiver;
+        vault_ = vault;
+        vaultAdded_ = vaultAdded;
+        initialPrice_ = INITIAL_ETF_PRICE;
+    }
+
+    /**
      * @notice setVault sets the ETF's vault
+     * @dev setVault as public coz we want to be able to set the vault when we do
+     *      the internal testing (internal) and after deployment (external)
      * @param vault_ The Risedle Vault address
      */
     function setVault(address vault_) public {
-        require(!vaultAdded, "ALREADY_INITIALIZED");
+        require(!vaultAdded, "!vaultAdded");
         // Set vaultAdded to true
         vaultAdded = true;
-        // Sanity check
-        IRisedleVault(vault_).totalOutstandingDebt();
+
         // Set the vault address
         vault = vault_;
         emit ETFVaultConfigured(msg.sender, vault_);
     }
 
-    /// @notice getTotalSupply returns the total supply of the ETF token
-    function getTotalSupply() internal view returns (uint256) {
-        IERC20 etfToken = IERC20(address(this));
-        return etfToken.totalSupply();
-    }
-
     /**
-     * @notice updateFeeReceiver updates the fee receiver address.
+     * @notice setFeeReceiver updates the fee receiver address.
      * @dev Only governor can call this function
      */
-    function updateFeeReceiver(address account)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setFeeReceiver(address account) external onlyOwner {
         feeReceiver = account;
 
         emit FeeReceiverUpdated(msg.sender, account);
