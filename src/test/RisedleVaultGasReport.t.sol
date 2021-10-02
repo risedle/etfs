@@ -36,7 +36,7 @@ contract RisedleVaultGasReportTest is
     }
 
     /// @notice Report gas usage of getUtilizationRateInEther
-    function test_GasGetUtilizationRateInEther() public view {
+    function test_GasGetUtilizationRateInEther() public pure {
         getUtilizationRateInEther(0, 0);
     }
 
@@ -51,7 +51,7 @@ contract RisedleVaultGasReportTest is
     }
 
     /// @notice Report gas usage of getInterestAmount
-    function test_GasGetInterestAmount() public view {
+    function test_GasGetInterestAmount() public pure {
         getInterestAmount(0.5 ether, 0.00001 ether, 3 hours);
     }
 
