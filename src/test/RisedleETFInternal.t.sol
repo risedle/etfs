@@ -22,14 +22,14 @@ import {RisedleETF} from "../RisedleETF.sol";
 string constant etfTokenName = "ETH 2x Leverage Risedle";
 string constant etfTokenSymbol = "ETHRISE";
 address constant wethAddress = WETH_ADDRESS;
-address constant etfGovernor = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // set random governor
 address constant etfFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
 uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
 
 // Set Risedle's Vault properties
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
-address constant usdtAddress = USDT_ADDRESS;
+address constant vaultUnderlyingAddress = USDT_ADDRESS;
+uint8 constant vaultUnderlyingDecimals = 6;
 
 contract RisedleETFInternalTest is
     DSTest,
@@ -37,7 +37,6 @@ contract RisedleETFInternalTest is
         etfTokenName,
         etfTokenSymbol,
         wethAddress,
-        etfGovernor,
         etfFeeReceiver,
         etfInitialPrice
     )
@@ -55,27 +54,27 @@ contract RisedleETFInternalTest is
         etfVault = new RisedleVault(
             vaultTokenName,
             vaultTokenSymbol,
-            usdtAddress,
-            6
+            vaultUnderlyingAddress,
+            vaultUnderlyingDecimals
         );
 
         // Set the vault
         setVault(address(etfVault));
     }
 
-    /// @notice Make sure all important variables are correctly set after deployment
+    /// @notice Make sure all important states are correctly set after deployment
     function test_ETFProperties() public {
         // Make sure underlying asset is correct
         assertEq(underlying, wethAddress);
-
-        // Make sure the governor address is correct
-        assertEq(governor, etfGovernor);
 
         // Make sure the fee receiver is correct
         assertEq(feeReceiver, etfFeeReceiver);
 
         // Make sure the vault address is correct
         assertEq(vault, address(etfVault));
+
+        // Make sure the vault added variable is set to true
+        assertTrue(vaultAdded);
 
         // Make sure the initial price is correct
         assertEq(INITIAL_ETF_PRICE, etfInitialPrice);
@@ -87,6 +86,6 @@ contract RisedleETFInternalTest is
         assertEq(etfTokenMetadata.decimals(), 18); // Default decimals
 
         // Make sure the total supply is set to zero
-        assertEq(getTotalSupply(), 0);
+        assertEq(totalSupply(), 0);
     }
 }
