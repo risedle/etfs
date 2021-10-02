@@ -113,5 +113,11 @@ contract RisedleETFInternalTest is
         (principalAmount, feeAmount) = getPrincipalAndFeeAmount(amount);
         assertEq(principalAmount, 999 * 1e12 * 1e18);
         assertEq(feeAmount, 1 * 1e12 * 1e18);
+
+        // Test with other than ether units, for example 1e6
+        amount = 1000 * 1e12 * 1e6; // 1000 trillion WETH
+        (principalAmount, feeAmount) = getPrincipalAndFeeAmount(amount);
+        assertEq(principalAmount, 999 * 1e12 * 1e6);
+        assertEq(feeAmount, 1 * 1e12 * 1e6);
     }
 }
