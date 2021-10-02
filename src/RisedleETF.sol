@@ -39,6 +39,9 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     /// @dev For example 100 USDT would be 100 * 1e6, coz USDT have 6 decimals
     uint256 internal immutable INITIAL_ETF_PRICE;
 
+    /// @notice The ETF's creation and redemption fee in ether units
+    uint256 internal FEE_IN_ETHER = 0.001 ether; // 0.1% creation and redemption fee
+
     /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
 
@@ -127,12 +130,19 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getAvailableCashToBorrow gets available cash from the vault
-     * @return The amount of cash available to borrow
+     * @notice getPrincipalAndFeeAmount splits principal and fee amount
+     * @dev we use principalAmount to get borrowAmount
+     * @param amount The amount of underlying asset deposited by the investor
+     * @return principalAmount The principal amount
+     * @return feeAmount The fee amount collected by the protocol
      */
-    function getAvailableCashToBorrow() internal returns (uint256) {
-        // IRisedleVault vault = IRisedleVault(adddress(vault));
-        // return vault.getTotalAvailableCash();
+    function getPrincipalAndFeeAmount(uint256 amount)
+        internal
+        view
+        returns (uint256 principalAmount, uint256 feeAmount)
+    {
+        feeAmount = (amount * FEE_IN_ETHER) / 1 ether;
+        principalAmount = amount - feeAmount;
     }
 
     /**
