@@ -7,7 +7,8 @@ export DAPP_BUILD_OPTIMIZE=0
 CHAIN=ethereum dapp build &> /dev/null
 
 # select the filename and the contract in it
-PATTERN=".contracts[\"src/$NAME.sol\"].$NAME"
+CONTRACT_NAME="RisedleVault"
+PATTERN=".contracts[\"src/$CONTRACT_NAME.sol\"].$CONTRACT_NAME"
 ABI=$(jq -r "$PATTERN.abi" out/dapp.sol.json)
 SIG=$(echo $ABI | seth --abi-constructor)
 BYTECODE=0x$(jq -r "$PATTERN.evm.bytecode.object" out/dapp.sol.json)
