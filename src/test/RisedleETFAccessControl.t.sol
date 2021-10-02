@@ -150,4 +150,38 @@ contract RisedleETFAccessControlTest is DSTest {
         // The free receiver address should be updated
         assertEq(etfFeeReceiver, newFeeReceiver);
     }
+
+    /// @notice Make sure non governor cannot update the fee
+    function testFail_NonGovernorCannotUpdateFee() public {
+        // Create new ETF
+        address feeReceiver = hevm.addr(1);
+        address governor = hevm.addr(2); // set random address as governor
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
+        RisedleETF etf = createNewETF(feeReceiver, initialPrice);
+
+        // Transfer the ownership to new governor
+        etf.transferOwnership(governor);
+
+        // Call the setFee as public user
+        // This should be failed
+        etf.setFee(0.01 ether);
+    }
+
+    /// @notice Make sure governor can update the fee
+    function test_GovernorCanUpdateFee() public {
+        // Create new ETF
+        address feeReceiver = hevm.addr(1);
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
+        RisedleETF etf = createNewETF(feeReceiver, initialPrice);
+
+        // Call the setFee as governor
+        uint256 newFeeInEther = 0.05 ether;
+        etf.setFee(newFeeInEther);
+
+        // Get the current fees
+        (uint256 currentFeeInEther, , ) = etf.getFees();
+
+        // Make sure the fee is updated
+        assertEq(currentFeeInEther, newFeeInEther);
+    }
 }

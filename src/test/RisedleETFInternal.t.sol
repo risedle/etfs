@@ -82,6 +82,10 @@ contract RisedleETFInternalTest is
         // Make sure the fee is correct
         assertEq(FEE_IN_ETHER, 0.001 ether); // 0.1%
 
+        // Make sure the total pending fees is zero
+        assertEq(totalPendingCreationFees, 0);
+        assertEq(totalPendingRedemptionFees, 0);
+
         // Make sure the ETF's token properties is correct
         IERC20Metadata etfTokenMetadata = IERC20Metadata(address(this));
         assertEq(etfTokenMetadata.name(), etfTokenName);
