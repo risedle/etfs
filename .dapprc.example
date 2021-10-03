@@ -1,5 +1,5 @@
 # Set solidity version
-export DAPP_SOLC_VERSION=0.8.7
+export DAPP_SOLC_VERSION=0.7.6
 
 # To surpress $(dapp remappings) error
 export DAPP_REMAPPINGS=""
@@ -7,11 +7,20 @@ export DAPP_REMAPPINGS=""
 if [ "$CHAIN" == "ethereum" ]
 then
   export ETH_RPC_URL=
-  export DAPP_REMAPPINGS="chain/=src/test/ethereum/"
+    export DAPP_REMAPPINGS=$(cat <<EOF
+@uniswap/v3-core/=lib/v3-core/
+chain/=src/test/ethereum/
+EOF
+)
 fi
 
 if [ "$CHAIN" == "arbitrum" ]
 then
   export ETH_RPC_URL=
   export DAPP_REMAPPINGS="chain/=src/test/arbitrum/"
+  export DAPP_REMAPPINGS=$(cat <<EOF
+@uniswap/v3-core/=lib/v3-core/
+chain/=src/test/arbitrum/
+EOF
+)
 fi
