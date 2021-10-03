@@ -42,16 +42,12 @@ contract RisedleETFAccessControlTest is DSTest {
     }
 
     /// @notice Utility function to create new ETF
-    function createNewETF(address feeRecipient, uint256 initialPrice)
-        internal
-        returns (RisedleETF)
-    {
+    function createNewETF(uint256 initialPrice) internal returns (RisedleETF) {
         // Create new ETF
         RisedleETF etf = new RisedleETF(
             "ETH 2x Leverage Risedle",
             "ETHRISE",
             WETH_ADDRESS,
-            feeRecipient,
             initialPrice
         );
         return etf;
@@ -60,16 +56,15 @@ contract RisedleETFAccessControlTest is DSTest {
     /// @notice Make sure we can call setVault after deployment
     /// @dev This is by design and the setVault only called once after deployment
     function test_AnyoneCanSetVaultAfterDeployment() public {
-        // Set random address as governor and fee recipient
+        // Set random address as governor
         address governor = hevm.addr(1);
-        address feeRecipient = hevm.addr(2);
 
         // Create new vault
         RisedleVault vault = createNewVault();
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice);
+        RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
 
         // Run the setVault function as public user
@@ -82,16 +77,15 @@ contract RisedleETFAccessControlTest is DSTest {
 
     /// @notice Make sure setVault can only called once
     function testFail_SetVaultOnlyCalledOnce() public {
-        // Set random address as governor and fee recipient
+        // Set random address as governor
         address governor = hevm.addr(1);
-        address feeRecipient = hevm.addr(2);
 
         // Create new vault
         RisedleVault vault = createNewVault();
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice);
+        RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
 
         // Run the setVault function as public user
@@ -102,16 +96,15 @@ contract RisedleETFAccessControlTest is DSTest {
     }
 
     /// @notice Make sure non-governor account cannot update the fee recipient address
-    function testFail_NonGovernorCannotsetFeeRecipient() public {
+    function testFail_NonGovernorCannotSetFeeRecipient() public {
         // Set random address as governor and fee recipient
         address governor = hevm.addr(1);
-        address feeRecipient = hevm.addr(2);
 
         // Create new vault
         RisedleVault vault = createNewVault();
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice);
+        RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
         etf.setVault(address(vault));
 
@@ -121,24 +114,18 @@ contract RisedleETFAccessControlTest is DSTest {
     }
 
     /// @notice Make sure Governor account can update the fee recipient address
-    function test_GovernorCanUpdateFreeReceiver() public {
-        // Set this contract as the governor
-        address feeRecipient = hevm.addr(2);
-
+    function test_GovernorCanUpdateFreeRecipient() public {
         // Create new vault
         RisedleVault vault = createNewVault();
 
         // Create new ETF
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice); // This contract as the governor
+        RisedleETF etf = createNewETF(initialPrice); // This contract as the governor
         etf.setVault(address(vault));
 
         // Get the ETF information
         address etfFeeRecipient;
         (, etfFeeRecipient, , , ) = etf.getETFInformation();
-
-        // Make sure the free receiver is correct
-        assertEq(etfFeeRecipient, feeRecipient);
 
         // Run the setFeeRecipient function as governor
         address newFeeRecipient = hevm.addr(3);
@@ -154,10 +141,9 @@ contract RisedleETFAccessControlTest is DSTest {
     /// @notice Make sure non governor cannot update the fee
     function testFail_NonGovernorCannotUpdateFee() public {
         // Create new ETF
-        address feeRecipient = hevm.addr(1);
         address governor = hevm.addr(2); // set random address as governor
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice);
+        RisedleETF etf = createNewETF(initialPrice);
 
         // Transfer the ownership to new governor
         etf.transferOwnership(governor);
@@ -170,9 +156,8 @@ contract RisedleETFAccessControlTest is DSTest {
     /// @notice Make sure governor can update the fee
     function test_GovernorCanUpdateFee() public {
         // Create new ETF
-        address feeRecipient = hevm.addr(1);
         uint256 initialPrice = 100 * 1e6; // 100 USDT
-        RisedleETF etf = createNewETF(feeRecipient, initialPrice);
+        RisedleETF etf = createNewETF(initialPrice);
 
         // Call the setFee as governor
         uint256 newFeeInEther = 0.05 ether;

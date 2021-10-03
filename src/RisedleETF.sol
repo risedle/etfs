@@ -57,21 +57,19 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
      * @param name The ETF's name
      * @param symbol The ETF's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
-     * @param feeRecipient_ The account address that receive the ETF fee
      * @param initialETFPrice The initial ETF price in term of vault's underlying asset
      */
     constructor(
         string memory name,
         string memory symbol,
         address underlying_,
-        address feeRecipient_,
         uint256 initialETFPrice
     ) ERC20(name, symbol) {
         // Set the underlying ETF's asset
         underlying = underlying_;
 
-        // Set the fee recipient address
-        feeRecipient = feeRecipient_;
+        // Set contract deployer as the fee recipient address by default
+        feeRecipient = msg.sender;
 
         // Set the initial price
         INITIAL_ETF_PRICE = initialETFPrice;
