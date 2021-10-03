@@ -12,68 +12,69 @@
 // Copyright (c) 2021 Bayu - All rights reserved
 // github: pyk
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/SafeERC20.sol";
+import {SafeMath} from "lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {FullMath} from "lib/v3-core/contracts/libraries/FullMath.sol";
+
+import {IERC20Metadata} from "./IERC20Metadata.sol";
 
 /// @title Risedle's Vault
 contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @notice To keep track the authorized borrower
+    // To keep track the authorized borrower
     mapping(address => bool) private _isBorrower;
 
-    /// @notice The underlying assets address contract (ERC20)
+    // The underlying assets address contract (ERC20)
     address public immutable underlying;
 
-    /// @notice The Vault's fee recipient address
+    // The Vault's fee recipient address
     address internal feeRecipient;
 
-    /// @notice The vault token decimals
-    uint8 private immutable _decimals;
-
-    /// @notice The total debt proportion issued by the vault, the usage is
-    ///         similar to the vault token supply. In order to track the
-    ///         outstanding debt of the borrower
+    // The total debt proportion issued by the vault, the usage is
+    // similar to the vault token supply. In order to track the
+    // outstanding debt of the borrower
     uint256 internal totalDebtProportion;
 
-    /// @notice Mapping borrower to their debt proportion of totalOutstandingDebt
-    /// @dev debt = _debtProportion[borrower] * debtProportionRate
+    // Mapping borrower to their debt proportion of totalOutstandingDebt
+    // debt = _debtProportion[borrower] * debtProportionRate
     mapping(address => uint256) private _debtProportion;
 
-    /// @notice Optimal utilization rate in ether units
+    // Optimal utilization rate in ether units
     uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
 
-    /// @notice Interest slope 1 in ether units
+    // Interest slope 1 in ether units
     uint256 internal INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
 
-    /// @notice Interest slop 2 in ether units
+    // Interest slop 2 in ether units
     uint256 internal INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
 
-    /// @notice Number of seconds in a year (approximation)
+    // Number of seconds in a year (approximation)
     uint256 internal immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
 
-    /// @notice Maximum borrow rate per second in ether units
+    // Maximum borrow rate per second in ether units
     uint256 internal MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
 
-    /// @notice Performance fee for the lender
+    // Performance fee for the lender
     uint256 internal PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
 
-    /// @notice The total amount of principal borrowed plus interest accrued
+    // The total amount of principal borrowed plus interest accrued
     uint256 public totalOutstandingDebt;
 
-    /// @notice The total amount of pending fees to be collected in the vault
+    // The total amount of pending fees to be collected in the vault
     uint256 public totalPendingFees;
 
-    /// @notice Timestamp that interest was last accrued at
+    // Timestamp that interest was last accrued at
     uint256 internal lastTimestampInterestAccrued;
 
-    /// @notice Event emitted when the interest succesfully accrued
+    // Event emitted when the interest succesfully accrued
     event InterestAccrued(
         uint256 previousTimestamp,
         uint256 currentTimestamp,
@@ -88,7 +89,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         uint256 totalPendingFees
     );
 
-    /// @notice Event emitted when lender add supply to the vault
+    // Event emitted when lender add supply to the vault
     event SupplyAdded(
         address indexed account,
         uint256 amount,
@@ -96,7 +97,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         uint256 mintedAmount
     );
 
-    /// @notice Event emitted when lender remove supply from the vault
+    // Event emitted when lender remove supply from the vault
     event SupplyRemoved(
         address indexed account,
         uint256 amount,
@@ -104,21 +105,21 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         uint256 redeemedAmount
     );
 
-    /// @notice Event emitted when borrower borrow from the vault
+    // Event emitted when borrower borrow from the vault
     event Borrowed(
         address indexed account,
         uint256 amount,
         uint256 debtProportionRateInEther
     );
 
-    /// @notice Event emitted when borrower repay to the vault
+    // Event emitted when borrower repay to the vault
     event Repaid(
         address indexed account,
         uint256 amount,
         uint256 debtProportionRateInEther
     );
 
-    /// @notice Event emitted when vault parameters are updated
+    // Event emitted when vault parameters are updated
     event VaultParametersUpdated(
         address indexed updater,
         uint256 u,
@@ -128,10 +129,10 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         uint256 fee
     );
 
-    /// @notice Event emitted when the collected fees are withdrawn
+    // Event emitted when the collected fees are withdrawn
     event FeeCollected(address collector, uint256 total, address feeRecipient);
 
-    /// @notice Event emitted when the fee recipient is updated
+    // Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newFeeRecipient);
 
     /**
@@ -139,34 +140,24 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
      * @param name The Vault's token name
      * @param symbol The Vault's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
-     * @param underlyingDecimals_ The ERC20 decimals of underlying asset
      */
     constructor(
         string memory name,
         string memory symbol,
-        address underlying_,
-        uint8 underlyingDecimals_
+        address underlying_
     ) ERC20(name, symbol) {
-        // Sanity check
-        IERC20(underlying_).totalSupply();
-
         // Set underlying asset contract address
         underlying = underlying_;
 
         // Set vault token decimals similar to the underlying
-        _decimals = underlyingDecimals_;
+        IERC20Metadata token = IERC20Metadata(underlying_);
+        _setupDecimals(token.decimals());
 
         // Set contract deployer as fee recipient address
         feeRecipient = msg.sender;
 
         // Initialize the last timestamp accrued
         lastTimestampInterestAccrued = block.timestamp;
-    }
-
-    /// @notice Overwrite the vault token decimals
-    /// @dev https://docs.openzeppelin.com/contracts/4.x/erc20
-    function decimals() public view virtual override returns (uint8) {
-        return _decimals;
     }
 
     /**
@@ -204,8 +195,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     function getTotalAvailableCash() public view returns (uint256) {
         IERC20 underlyingToken = IERC20(underlying);
         uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
-        if (totalPendingFees >= underlyingBalance) return 0;
-        return underlyingBalance - totalPendingFees;
+        return SafeMath.sub(underlyingBalance, totalPendingFees);
     }
 
     /**
@@ -213,12 +203,12 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
      *         the vault.
      * @param available The amount of cash available to borrow in the vault
      * @param outstandingDebt The amount of outstanding debt in the vault
-     * @return The utilization rate in ether units
+     * @return rateInEther The utilization rate in ether units
      */
     function getUtilizationRateInEther(
         uint256 available,
         uint256 outstandingDebt
-    ) public pure returns (uint256) {
+    ) public pure returns (uint256 rateInEther) {
         // Utilization rate is 0% when there is no outstandingDebt asset
         if (outstandingDebt == 0) return 0;
 
@@ -226,21 +216,23 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         if (available == 0 && outstandingDebt > 0) return 1 ether;
 
         // utilization rate = amount outstanding debt / (amount available + amount outstanding debt)
-        uint256 rateInEther = (outstandingDebt * 1 ether) /
-            (outstandingDebt + available);
-        return rateInEther;
+        rateInEther = FullMath.mulDiv(
+            outstandingDebt,
+            1 ether,
+            SafeMath.add(outstandingDebt, available)
+        );
     }
 
     /**
      * @notice getBorrowRatePerSecondInEther calculates the borrow rate per second
      *         in ether units
      * @param utilizationRateInEther The current utilization rate in ether units
-     * @return The borrow rate per second in ether units
+     * @return borrowRatePerSecondInEther The borrow rate per second in ether units
      */
     function getBorrowRatePerSecondInEther(uint256 utilizationRateInEther)
         public
         view
-        returns (uint256)
+        returns (uint256 borrowRatePerSecondInEther)
     {
         // utilizationRateInEther should in range [0, 1e18], Otherwise return max borrow rate
         if (utilizationRateInEther >= 1 ether) {
@@ -249,37 +241,47 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Calculate the borrow rate
         // See the formula here: https://observablehq.com/@pyk  /ethrise
+        uint256 borrowRatePerYearInEther;
         if (utilizationRateInEther <= OPTIMAL_UTILIZATION_RATE_IN_ETHER) {
             // Borrow rate per year = (utilization rate/optimal utilization rate) * interest slope 1
             // Borrow rate per seconds = Borrow rate per year / seconds in a year
-            uint256 rateInEther = (utilizationRateInEther * 1 ether) /
-                OPTIMAL_UTILIZATION_RATE_IN_ETHER;
-            uint256 borrowRatePerYearInEther = (rateInEther *
-                INTEREST_SLOPE_1_IN_ETHER) / 1 ether;
-            uint256 borrowRatePerSecondInEther = borrowRatePerYearInEther /
-                TOTAL_SECONDS_IN_A_YEAR;
-            return borrowRatePerSecondInEther;
+            uint256 rateRatioInEther = FullMath.mulDiv(
+                utilizationRateInEther,
+                1 ether,
+                OPTIMAL_UTILIZATION_RATE_IN_ETHER
+            );
+            borrowRatePerYearInEther = FullMath.mulDiv(
+                rateRatioInEther,
+                INTEREST_SLOPE_1_IN_ETHER,
+                1 ether
+            );
         } else {
             // Borrow rate per year = interest slope 1 + ((utilization rate - optimal utilization rate)/(1-utilization rate)) * interest slope 2
             // Borrow rate per seconds = Borrow rate per year / seconds in a year
-            uint256 aInEther = utilizationRateInEther -
-                OPTIMAL_UTILIZATION_RATE_IN_ETHER;
-            uint256 bInEther = 1 ether - utilizationRateInEther;
-            uint256 cInEther = (aInEther * 1 ether) / bInEther;
-            uint256 dInEther = (cInEther * INTEREST_SLOPE_2_IN_ETHER) / 1 ether;
-            uint256 borrowRatePerYearInEther = INTEREST_SLOPE_1_IN_ETHER +
-                dInEther;
-            uint256 borrowRatePerSecondInEther = borrowRatePerYearInEther /
-                TOTAL_SECONDS_IN_A_YEAR;
-            // Cap the borrow rate
-            if (
-                borrowRatePerSecondInEther >=
-                MAX_BORROW_RATE_PER_SECOND_IN_ETHER
-            ) {
-                return MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
-            }
+            uint256 aInEther = SafeMath.sub(
+                utilizationRateInEther,
+                OPTIMAL_UTILIZATION_RATE_IN_ETHER
+            );
+            uint256 bInEther = SafeMath.sub(1 ether, utilizationRateInEther);
+            uint256 cInEther = FullMath.mulDiv(aInEther, 1 ether, bInEther);
+            uint256 dInEther = FullMath.mulDiv(
+                cInEther,
+                INTEREST_SLOPE_2_IN_ETHER,
+                1 ether
+            );
+            borrowRatePerYearInEther = SafeMath.add(
+                INTEREST_SLOPE_1_IN_ETHER,
+                dInEther
+            );
+        }
 
-            return borrowRatePerSecondInEther;
+        borrowRatePerSecondInEther = FullMath.mulDiv(
+            borrowRatePerYearInEther,
+            1,
+            TOTAL_SECONDS_IN_A_YEAR
+        );
+        if (borrowRatePerSecondInEther >= MAX_BORROW_RATE_PER_SECOND_IN_ETHER) {
+            return MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
         }
     }
 
@@ -289,14 +291,14 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
      * @param outstandingDebt Total of outstanding debt, in underlying decimals
      * @param borrowRatePerSecondInEther Borrow rates per second in ether units
      * @param elapsedSeconds Number of seconds elapsed since last accrued
-     * @return The total interest amount, it have similar decimals with
-     *         totalOutstandingDebt and totalPendingFees.
+     * @return interestAmount The total interest amount, it have similar decimals
+     *         with totalOutstandingDebt and totalPendingFees.
      */
     function getInterestAmount(
         uint256 outstandingDebt,
         uint256 borrowRatePerSecondInEther,
         uint256 elapsedSeconds
-    ) internal pure returns (uint256) {
+    ) internal pure returns (uint256 interestAmount) {
         // Early returns
         if (
             outstandingDebt == 0 ||
@@ -308,10 +310,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Calculate the amount of interest
         // interest amount = borrowRatePerSecondInEther * elapsedSeconds * outstandingDebt
-        uint256 interestAmount = (borrowRatePerSecondInEther *
-            elapsedSeconds *
-            outstandingDebt) / 1 ether;
-        return interestAmount;
+        interestAmount = FullMath.mulDiv(
+            SafeMath.mul(borrowRatePerSecondInEther, elapsedSeconds),
+            outstandingDebt,
+            1 ether
+        );
     }
 
     /**
@@ -324,12 +327,18 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         internal
     {
         // Get the fee
-        uint256 feeAmount = (PERFORMANCE_FEE_IN_ETHER * interestAmount) /
-            1 ether;
+        uint256 feeAmount = FullMath.mulDiv(
+            PERFORMANCE_FEE_IN_ETHER,
+            interestAmount,
+            1 ether
+        );
 
         // Update the states
-        totalOutstandingDebt = totalOutstandingDebt + interestAmount;
-        totalPendingFees = totalPendingFees + feeAmount;
+        totalOutstandingDebt = SafeMath.add(
+            totalOutstandingDebt,
+            interestAmount
+        );
+        totalPendingFees = SafeMath.add(totalPendingFees, feeAmount);
         lastTimestampInterestAccrued = currentTimestamp;
     }
 
@@ -365,7 +374,10 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         );
 
         // Get time elapsed since last accrued
-        uint256 elapsedSeconds = currentTimestamp - previousTimestamp;
+        uint256 elapsedSeconds = SafeMath.sub(
+            currentTimestamp,
+            previousTimestamp
+        );
 
         // Get the interest amount
         uint256 interestAmount = getInterestAmount(
@@ -397,22 +409,31 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /**
      * @notice getExchangeRateInEther get the current exchange rate of vault token
      *         in term of underlying asset.
-     * @return The exchange rates in ether units
+     * @return exchangeRateInEther The exchange rates in ether units
      */
-    function getExchangeRateInEther() internal view returns (uint256) {
+    function getExchangeRateInEther()
+        internal
+        view
+        returns (uint256 exchangeRateInEther)
+    {
         uint256 totalSupply = totalSupply();
 
         if (totalSupply == 0) {
             // If there is no supply, exchange rate is 1:1
-            return 1 ether;
+            exchangeRateInEther = 1 ether;
         } else {
             // Otherwise: exchangeRate = (totalAvailable + totalOutstandingDebt) / totalSupply
             uint256 totalAvailable = getTotalAvailableCash();
-            uint256 totalAllUnderlyingAsset = totalAvailable +
-                totalOutstandingDebt;
-            uint256 exchangeRateInEther = (totalAllUnderlyingAsset * 1 ether) /
-                totalSupply;
-            return exchangeRateInEther;
+            uint256 totalAllUnderlyingAsset = SafeMath.add(
+                totalAvailable,
+                totalOutstandingDebt
+            );
+
+            exchangeRateInEther = FullMath.mulDiv(
+                totalAllUnderlyingAsset,
+                1 ether,
+                totalSupply
+            );
         }
     }
 
@@ -446,8 +467,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate how much vault token we need to send to the lender
-        uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther;
-
+        uint256 mintedAmount = FullMath.mulDiv(
+            amount,
+            1 ether,
+            exchangeRateInEther
+        );
         // Send vault token to the lender
         _mint(msg.sender, mintedAmount);
 
@@ -470,7 +494,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         _burn(msg.sender, amount);
 
         // Calculate how much underlying token we need to send to the lender
-        uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether;
+        uint256 redeemedAmount = FullMath.mulDiv(
+            exchangeRateInEther,
+            amount,
+            1 ether
+        );
 
         // Transfer underlying asset from the vault to the lender
         IERC20 underlyingToken = IERC20(underlying);
@@ -488,15 +516,21 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /**
      * @notice getDebtProportionRateInEther returns the proportion of borrow
      *         amount relative to the totalOutstandingDebt
-     * @return The debt proportion rate in ether units
+     * @return debtProportionRateInEther The debt proportion rate in ether units
      */
-    function getDebtProportionRateInEther() internal view returns (uint256) {
+    function getDebtProportionRateInEther()
+        internal
+        view
+        returns (uint256 debtProportionRateInEther)
+    {
         if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
             return 1 ether;
         }
-        uint256 debtProportionRateInEther = (totalOutstandingDebt * 1 ether) /
-            totalDebtProportion;
-        return debtProportionRateInEther;
+        debtProportionRateInEther = FullMath.mulDiv(
+            totalOutstandingDebt,
+            1 ether,
+            totalDebtProportion
+        );
     }
 
     /**
@@ -506,7 +540,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     function getOutstandingDebt(address account)
         external
         view
-        returns (uint256)
+        returns (uint256 outstandingDebt)
     {
         // If there is no debt, return 0
         if (totalOutstandingDebt == 0) {
@@ -516,11 +550,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         // Calculate the outstanding debt
         // outstanding debt = debtProportion * debtProportionRate
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        uint256 a = (_debtProportion[account] * debtProportionRateInEther);
-        uint256 b = 1 ether;
-        uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
-
-        return outstandingDebt;
+        outstandingDebt = FullMath.mulDivRoundingUp(
+            _debtProportion[account],
+            debtProportionRateInEther,
+            1 ether
+        );
     }
 
     /**
@@ -536,15 +570,22 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
 
         // Get the borrower amount proportion to existing totalOutstandingDebt
-        uint256 borrowProportion = (amount * 1 ether) /
-            debtProportionRateInEther;
+        uint256 borrowProportion = FullMath.mulDiv(
+            amount,
+            1 ether,
+            debtProportionRateInEther
+        );
 
         // Do the accounting first before transfering any asset
-        totalOutstandingDebt = totalOutstandingDebt + amount;
-        totalDebtProportion = totalDebtProportion + borrowProportion;
-        _debtProportion[msg.sender] =
-            _debtProportion[msg.sender] +
-            borrowProportion;
+        totalOutstandingDebt = SafeMath.add(totalOutstandingDebt, amount);
+        totalDebtProportion = SafeMath.add(
+            totalDebtProportion,
+            borrowProportion
+        );
+        _debtProportion[msg.sender] = SafeMath.add(
+            _debtProportion[msg.sender],
+            borrowProportion
+        );
 
         // Transfer underlying asset from the vault to the borrower
         IERC20 underlyingToken = IERC20(underlying);
@@ -572,15 +613,22 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Calculate how many debtProportion we need to substract from borrower
         // and totalDebtProportion based on the repay amount
-        uint256 repayProportion = (amount * 1 ether) /
-            debtProportionRateInEther;
+        uint256 repayProportion = FullMath.mulDiv(
+            amount,
+            1 ether,
+            debtProportionRateInEther
+        );
 
         // Do the accounting
-        totalOutstandingDebt = totalOutstandingDebt - amount;
-        totalDebtProportion = totalDebtProportion - repayProportion;
-        _debtProportion[msg.sender] =
-            _debtProportion[msg.sender] -
-            repayProportion;
+        totalOutstandingDebt = SafeMath.sub(totalOutstandingDebt, amount);
+        totalDebtProportion = SafeMath.sub(
+            totalDebtProportion,
+            repayProportion
+        );
+        _debtProportion[msg.sender] = SafeMath.sub(
+            _debtProportion[msg.sender],
+            repayProportion
+        );
 
         // Emit event
         emit Repaid(msg.sender, amount, debtProportionRateInEther);
