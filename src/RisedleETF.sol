@@ -26,8 +26,8 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     /// @notice The underlying assets address contract (ERC20)
     address internal immutable underlying;
 
-    /// @notice The ETF's fee receiver address
-    address internal feeReceiver;
+    /// @notice The ETF's fee recipient address
+    address internal feeRecipient;
 
     /// @notice The Risedle Vault address
     address internal vault;
@@ -49,29 +49,29 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
 
-    /// @notice Event emitted when the fee receiver is updated
-    event FeeReceiverUpdated(address updater, address newFeeReceiver);
+    /// @notice Event emitted when the fee recipient is updated
+    event FeeRecipientUpdated(address updater, address newfeeRecipient);
 
     /**
      * @notice Construct new ETF
      * @param name The ETF's name
      * @param symbol The ETF's token symbol
      * @param underlying_ The ERC20 contract address of underlying asset
-     * @param feeReceiver_ The account address that receive the ETF fee
+     * @param feeRecipient_ The account address that receive the ETF fee
      * @param initialETFPrice The initial ETF price in term of vault's underlying asset
      */
     constructor(
         string memory name,
         string memory symbol,
         address underlying_,
-        address feeReceiver_,
+        address feeRecipient_,
         uint256 initialETFPrice
     ) ERC20(name, symbol) {
         // Set the underlying ETF's asset
         underlying = underlying_;
 
-        // Set the fee receiver address
-        feeReceiver = feeReceiver_;
+        // Set the fee recipient address
+        feeRecipient = feeRecipient_;
 
         // Set the initial price
         INITIAL_ETF_PRICE = initialETFPrice;
@@ -84,7 +84,7 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
      * @notice getETFInformation returns information about the ETF
      * @dev Returns all public info in one function so we can save gas
      * @return underlying_ Address of the underlying asset
-     * @return feeReceiver_ Address of the fee receiver
+     * @return feeRecipient_ Address of the fee recipient
      * @return vault_ Address of the vault
      * @return vaultAdded_ True if the ETF vaule has beed added
      * @return initialPrice_ Initial price of the ETF
@@ -94,14 +94,14 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
         view
         returns (
             address underlying_,
-            address feeReceiver_,
+            address feeRecipient_,
             address vault_,
             bool vaultAdded_,
             uint256 initialPrice_
         )
     {
         underlying_ = underlying;
-        feeReceiver_ = feeReceiver;
+        feeRecipient_ = feeRecipient;
         vault_ = vault;
         vaultAdded_ = vaultAdded;
         initialPrice_ = INITIAL_ETF_PRICE;
@@ -124,13 +124,13 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice setFeeReceiver updates the fee receiver address.
+     * @notice setFeeRecipient updates the fee recipient address.
      * @dev Only governor can call this function
      */
-    function setFeeReceiver(address account) external onlyOwner {
-        feeReceiver = account;
+    function setFeeRecipient(address account) external onlyOwner {
+        feeRecipient = account;
 
-        emit FeeReceiverUpdated(msg.sender, account);
+        emit FeeRecipientUpdated(msg.sender, account);
     }
 
     /**
@@ -183,9 +183,14 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
      * @param amount The amount of the underlying asset to supply
      */
     function mint(uint256 amount) external nonReentrant {
-        // Get amount of cash that we can borrow from the vault
-        // uint256 vaultCash = getAvailableCashToBorrow();
-        // Get the current price of ETF's underlying asset in term of Vault's underlying asset
-        // TODO: how?
+        // Get principal and fee amount
+        // (uint256 principalAmount, uint256 feeAmount) = getPrincipalAndFeeAmount(
+        //     amount
+        // );
+        // Get the borrowAmount based on the principalAmount
+        // Convert the ETF underlying asset to the Vault underlying asset
+        // TODO:
+        // 1. get ETH/USD price
+        // 2. Convert principalAmount to borrowAmount based on the ETH/USD price
     }
 }

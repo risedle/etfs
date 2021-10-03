@@ -248,41 +248,41 @@ contract RisedleVaultAccessControlTest is DSTest {
         assertEq(f, fee);
     }
 
-    /// @notice Make sure non-governor account cannot change the fee receiver
-    function testFail_NonGovernorCannotSetFeeReceiverAddress() public {
+    /// @notice Make sure non-governor account cannot change the fee recipient
+    function testFail_NonGovernorCannotSetFeeRecipientAddress() public {
         // Set governor
         address governor = hevm.addr(2);
         RisedleVault vault = createNewVault();
         vault.transferOwnership(governor);
 
         // Make sure it fails
-        vault.setFeeReceiver(hevm.addr(3));
+        vault.setFeeRecipient(hevm.addr(3));
     }
 
-    /// @notice Make sure governor can update the fee receiver
-    function test_GovernorCanSetFeeReceiverAddress() public {
-        // Set the new fee receiver
+    /// @notice Make sure governor can update the fee recipient
+    function test_GovernorCanSetFeeRecipientAddress() public {
+        // Set the new fee recipient
         address newReceiver = hevm.addr(2);
 
         // Create new vault
         RisedleVault vault = createNewVault();
 
-        // Update the fee receiver
-        vault.setFeeReceiver(newReceiver);
+        // Update the fee recipient
+        vault.setFeeRecipient(newReceiver);
 
         // If we are then the operation is succeed
         // Need to make sure via other external test tho
         assertTrue(true);
     }
 
-    /// @notice Make sure anyone can collect pending fees to fee receiver
-    function test_AnyoneCanCollectPendingFeesToFeeReceiver() public {
-        // Set the fee receiver
-        address feeReceiver = hevm.addr(3);
+    /// @notice Make sure anyone can collect pending fees to fee recipient
+    function test_AnyoneCanCollectPendingFeesToFeeRecipient() public {
+        // Set the fee recipient
+        address feeRecipient = hevm.addr(3);
 
         // Create new vault
         RisedleVault vault = createNewVault();
-        vault.setFeeReceiver(feeReceiver);
+        vault.setFeeRecipient(feeRecipient);
 
         // Simulate the borrowing activities
 
@@ -318,8 +318,8 @@ contract RisedleVaultAccessControlTest is DSTest {
         // Make sure totalPendingFees is set to zero
         assertEq(vault.totalPendingFees(), 0);
 
-        // Make sure the fee receiver have collectedFees balance
-        assertEq(USDT.balanceOf(feeReceiver), collectedFees);
+        // Make sure the fee recipient have collectedFees balance
+        assertEq(USDT.balanceOf(feeRecipient), collectedFees);
     }
 
     /// @notice Test accrue interest as public

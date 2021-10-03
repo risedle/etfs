@@ -15,44 +15,11 @@ pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 interface IRisedleVault {
-    /// @notice The Vault's underlying ERC20 contract
-    function underlying() external view returns (address);
-
-    /// @notice The Vault's governor address
-    function governor() external view returns (address);
-
-    /// @notice The Vault's fee receiver address
-    function feeReceiver() external view returns (address);
-
     /// @notice The Vault's total outstanding debt
     function totalOutstandingDebt() external view returns (address);
 
     /// @notice The Vault's pending fees
     function totalPendingFees() external view returns (uint256);
-
-    /// @notice The Vault's optimal utilization rate in ether units
-    function OPTIMAL_UTILIZATION_RATE_IN_ETHER()
-        external
-        view
-        returns (uint256);
-
-    /// @notice The Vault's interest rate model slope 1 in ether units
-    function INTEREST_SLOPE_1_IN_ETHER() external view returns (uint256);
-
-    /// @notice The Vault's interest rate model slope 2 in ether units
-    function INTEREST_SLOPE_2_IN_ETHER() external view returns (uint256);
-
-    /// @notice The Vault's max borrow rate per second in ether units
-    function MAX_BORROW_RATE_PER_SECOND_IN_ETHER()
-        external
-        view
-        returns (uint256);
-
-    /// @notice The Vault's performance fee for the lender in ether units
-    function PERFORMANCE_FEE_IN_ETHER() external view returns (uint256);
-
-    /// @notice The Vault's last timestamp accrued
-    function lastTimestampInterestAccrued() external view returns (uint256);
 
     /// @notice The Vault's token decimals
     function decimals() external view returns (uint256);
@@ -105,7 +72,7 @@ interface IRisedleVault {
     /// @dev Only authorized borrower can call this function
     function collectPendingFees() external;
 
-    /// @notice updateFeeReceiver updates the fee receiver address
+    /// @notice serFeeRecipient updates the fee receiver address
     /// @dev Only governor can call this function
-    function updateFeeReceiver(address account) external;
+    function serFeeRecipient(address account) external;
 }

@@ -22,7 +22,7 @@ import {RisedleETF} from "../RisedleETF.sol";
 string constant etfTokenName = "ETH 2x Leverage Risedle";
 string constant etfTokenSymbol = "ETHRISE";
 address constant wethAddress = WETH_ADDRESS;
-address constant etfFeeReceiver = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee receiver
+address constant etfFeeRecipient = 0xdAC17F958D2ee523a2206206994597C13D831ec7; // random fee recipient
 uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
 
 // Set Risedle's Vault properties
@@ -37,7 +37,7 @@ contract RisedleETFInternalTest is
         etfTokenName,
         etfTokenSymbol,
         wethAddress,
-        etfFeeReceiver,
+        etfFeeRecipient,
         etfInitialPrice
     )
 {
@@ -67,8 +67,8 @@ contract RisedleETFInternalTest is
         // Make sure underlying asset is correct
         assertEq(underlying, wethAddress);
 
-        // Make sure the fee receiver is correct
-        assertEq(feeReceiver, etfFeeReceiver);
+        // Make sure the fee recipient is correct
+        assertEq(feeRecipient, etfFeeRecipient);
 
         // Make sure the vault address is correct
         assertEq(vault, address(etfVault));

@@ -31,8 +31,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice The underlying assets address contract (ERC20)
     address public immutable underlying;
 
-    /// @notice The Vault's fee receiver address
-    address internal feeReceiver;
+    /// @notice The Vault's fee recipient address
+    address internal feeRecipient;
 
     /// @notice The vault token decimals
     uint8 private immutable _decimals;
@@ -129,10 +129,10 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     );
 
     /// @notice Event emitted when the collected fees are withdrawn
-    event FeeCollected(address collector, uint256 total, address feeReceiver);
+    event FeeCollected(address collector, uint256 total, address feeRecipient);
 
-    /// @notice Event emitted when the fee receiver is updated
-    event FeeReceiverUpdated(address updater, address newFeeReceiver);
+    /// @notice Event emitted when the fee recipient is updated
+    event FeeRecipientUpdated(address updater, address newFeeRecipient);
 
     /**
      * @notice Contruct new vault
@@ -156,8 +156,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         // Set vault token decimals similar to the underlying
         _decimals = underlyingDecimals_;
 
-        // Set contract deployer as fee receiver address
-        feeReceiver = msg.sender;
+        // Set contract deployer as fee recipient address
+        feeRecipient = msg.sender;
 
         // Initialize the last timestamp accrued
         lastTimestampInterestAccrued = block.timestamp;
@@ -637,7 +637,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice collectPendingFees withdraws collected fees to the feeReceiver address
+     * @notice collectPendingFees withdraws collected fees to the feeRecipient address
      * @dev Anyone can call this function
      */
     function collectPendingFees() external nonReentrant {
@@ -647,23 +647,23 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         // For logging purpose
         uint256 collectedFees = totalPendingFees;
 
-        // Transfer underlying asset from the vault to the fee receiver
+        // Transfer underlying asset from the vault to the fee recipient
         IERC20 underlyingToken = IERC20(underlying);
-        underlyingToken.safeTransfer(feeReceiver, collectedFees);
+        underlyingToken.safeTransfer(feeRecipient, collectedFees);
 
         // Reset the totalPendingFees
         totalPendingFees = 0;
 
-        emit FeeCollected(msg.sender, collectedFees, feeReceiver);
+        emit FeeCollected(msg.sender, collectedFees, feeRecipient);
     }
 
     /**
-     * @notice setFeeReceiver sets the fee receiver address.
+     * @notice setFeeRecipient sets the fee recipient address.
      * @dev Only governor can call this function
      */
-    function setFeeReceiver(address account) external onlyOwner {
-        feeReceiver = account;
+    function setFeeRecipient(address account) external onlyOwner {
+        feeRecipient = account;
 
-        emit FeeReceiverUpdated(msg.sender, account);
+        emit FeeRecipientUpdated(msg.sender, account);
     }
 }
