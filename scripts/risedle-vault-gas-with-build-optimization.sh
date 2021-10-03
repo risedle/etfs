@@ -15,7 +15,7 @@ SIG=$(echo $ABI | seth --abi-constructor)
 BYTECODE=0x$(jq -r "$PATTERN.evm.bytecode.object" out/dapp.sol.json)
 
 # estimate gas
-GAS=$(seth estimate --create $BYTECODE $SIG '"Risedle USDT Vault"' '"rvUSDT"' 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 6)
+GAS=$(seth estimate --create $BYTECODE $SIG '"Risedle USDC Vault"' '"rvUSDC"' 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
 
 echo "Risedle Vault with DAPP_BUILD_OPTIMIZE=1"
 echo "Deployment gas usage:" $GAS
