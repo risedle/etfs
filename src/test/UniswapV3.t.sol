@@ -90,6 +90,8 @@ contract UniswapV3Test is DSTest {
         uint256 borrowAmount = (collateralAmount * price) /
             (10**collateralDecimals);
         emit log_named_uint("borrowAmount", borrowAmount);
+        uint256 priceBump = getPriceBump(borrowAmount);
+        emit log_named_uint("priceBump", priceBump);
 
         // Perform swap
         // First let's assume the supply is 10K USDC
@@ -104,14 +106,15 @@ contract UniswapV3Test is DSTest {
         TransferHelper.safeApprove(
             USDC_ADDRESS,
             address(swapRouter),
-            borrowAmount
+            borrowAmount + priceBump
         );
+
+        // TODO: check if borrowAmount + priceBump < totalUnderlyingAsset
+        // otherwise cancel di transaction with !SupplyNotEnough
 
         uint24 poolFee = 500;
         // TODO: change amountInMaximum based on borrowAmount
         // uint256 amountInMaximum = balance;
-        uint256 priceBump = getPriceBump(borrowAmount);
-        emit log_named_uint("priceBump", priceBump);
         uint256 amountInMaximum = borrowAmount + priceBump;
         address recipient = hevm.addr(1);
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter
