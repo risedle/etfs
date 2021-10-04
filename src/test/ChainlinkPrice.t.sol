@@ -31,7 +31,8 @@ contract ChainlinkTest is DSTest {
         emit log_named_uint("ETH/USDC in 1e6", ETHinUSDC);
         emit log_named_uint("Value 0.5 ETH in 1e6 USDC", value);
 
-        assertTrue(false); // Set failed to show the emitted event
+        // Uncomment below to see log above
+        // assertTrue(false); // Set failed to show the emitted event
     }
 
     function _getChainlinkPriceInGwei(address feed)
