@@ -3,31 +3,36 @@
 // Risedle's Vault Internal Test
 // Test & validate all internal functionalities
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Hevm} from "./Hevm.sol";
-
-import {IERC20Metadata} from "../IERC20Metadata.sol";
 import {RisedleVault} from "../RisedleVault.sol";
 
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDC_ADDRESS} from "chain/Constants.sol";
+import {USDT_ADDRESS} from "chain/Constants.sol";
 
 // Set Risedle's Vault properties
-string constant vaultTokenName = "Risedle USDC Vault";
-string constant vaultTokenSymbol = "rvUSDC";
-address constant vaultUnderlying = USDC_ADDRESS;
+string constant vaultTokenName = "Risedle USDT Vault";
+string constant vaultTokenSymbol = "rvUSDT";
+address constant vaultUnderlying = USDT_ADDRESS;
+uint8 constant vaultUnderlyingDecimals = 6;
 
 contract RisedleVaultInternalTest is
     DSTest,
-    RisedleVault(vaultTokenName, vaultTokenSymbol, vaultUnderlying)
+    RisedleVault(
+        vaultTokenName,
+        vaultTokenSymbol,
+        vaultUnderlying,
+        vaultUnderlyingDecimals
+    )
 {
-    // hevm utils to alter mainnet state
+    /// @notice hevm utils to alter mainnet state
     Hevm hevm;
 
     function setUp() public {
@@ -70,7 +75,7 @@ contract RisedleVaultInternalTest is
         IERC20Metadata vaultTokenMetadata = IERC20Metadata(address(this));
         assertEq(vaultTokenMetadata.name(), vaultTokenName);
         assertEq(vaultTokenMetadata.symbol(), vaultTokenSymbol);
-        assertEq(uint256(vaultTokenMetadata.decimals()), 6); // Equal to USDT decimals
+        assertEq(vaultTokenMetadata.decimals(), 6); // Equal to USDT decimals
 
         // Make sure the total supply is set to zero
         assertEq(totalSupply(), 0);
@@ -82,35 +87,30 @@ contract RisedleVaultInternalTest is
         uint256 totalAvailable;
 
         amount = 1000 * 1e6; // 1000 USDT
-        hevm.setUSDCBalance(address(this), amount);
+        hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, amount);
 
         amount = 200 * 1e6; // 200 USDT
         totalPendingFees = 100 * 1e6; // 100 USDT
-        hevm.setUSDCBalance(address(this), amount);
+        hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, amount - totalPendingFees);
+
+        // This most likely never happen; but we need to make sure to handle it
+        // totalPendingFees > Underlying balance
+        amount = 100 * 1e6; // 100 USDT
+        totalPendingFees = 105 * 1e6; // 105 USDT
+        hevm.setUSDTBalance(address(this), amount);
+        totalAvailable = getTotalAvailableCash();
+        assertEq(totalAvailable, 0);
 
         // Test with very high number
         amount = 100 * 1e12 * 1e6; // 100 trillion USDT
         totalPendingFees = 90 * 1e12 * 1e6; // 90 trillion USDT
-        hevm.setUSDCBalance(address(this), amount);
+        hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, 10 * 1e12 * 1e6); // 10 trillion USDT
-    }
-
-    /// @notice Make sure getTotalAvailableCash revert when totalPendingFees is
-    ///         larger than the amount
-    function testFail_GetTotalAvailableCashUpnornal() public {
-        // This most likely never happen; but we need to make sure to handle it
-        // totalPendingFees > Underlying balance
-        uint256 amount = 100 * 1e6; // 100 USDT
-        totalPendingFees = 105 * 1e6; // 105 USDT
-        hevm.setUSDCBalance(address(this), amount);
-
-        // Should be failed
-        getTotalAvailableCash();
     }
 
     /// @notice Make sure the Utilization Rate calculation is correct
@@ -288,7 +288,7 @@ contract RisedleVaultInternalTest is
         totalOutstandingDebt = 0;
         totalPendingFees = 0;
         uint256 contractBalance = 1000 * 1e6; // 1000 USDT
-        hevm.setUSDCBalance(address(this), contractBalance); // Set the contract balance
+        hevm.setUSDTBalance(address(this), contractBalance); // Set the contract balance
         accrueInterest();
         // Make sure it doesn't change the totalOutstandingDebt and totalPendingFees
         assertEq(totalOutstandingDebt, 0);
@@ -297,7 +297,7 @@ contract RisedleVaultInternalTest is
         // Scenario 2: Below optimal utilization rate
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
         totalPendingFees = 20 * 1e6; // 20 USDT
-        hevm.setUSDCBalance(address(this), 50 * 1e6); // Set contract balance
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 24);
         // Set block timestamp to 24 hours later
@@ -312,7 +312,7 @@ contract RisedleVaultInternalTest is
         // Scenario 3: Above optimzal utilization rate
         totalOutstandingDebt = 400 * 1e6; // 400 USDT
         totalPendingFees = 20 * 1e6; // 20 USDT
-        hevm.setUSDCBalance(address(this), 50 * 1e6); // Set contract balance
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 3);
         // Set block timestamp to 3 hours later
@@ -327,7 +327,7 @@ contract RisedleVaultInternalTest is
         // Scenario 4: Maximum utilization rate
         totalOutstandingDebt = 15000 * 1e6; // 15000 USDT
         totalPendingFees = 20 * 1e6; // 20 USDT
-        hevm.setUSDCBalance(address(this), 50 * 1e6); // Set contract balance
+        hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 10);
         // Set block timestamp to 10 hours later
@@ -353,7 +353,7 @@ contract RisedleVaultInternalTest is
         // Scenario 2: Simulate lender already supply some asset but the
         // interest is not accrued yet
         uint256 suppliedUSDT = 100 * 1e6; // 100 USDT
-        hevm.setUSDCBalance(address(this), suppliedUSDT); // Set contract balance to 100USDT
+        hevm.setUSDTBalance(address(this), suppliedUSDT); // Set contract balance to 100USDT
 
         totalOutstandingDebt = 0;
         totalPendingFees = 0;
@@ -369,7 +369,7 @@ contract RisedleVaultInternalTest is
         // Scenario 3: Simulate that the totalOutstandingDebt is 50 USDT and interest
         // already accrued 10 USDT.
         // 1. Someone borrow the asset 50 USDT
-        hevm.setUSDCBalance(address(this), suppliedUSDT - (50 * 1e6)); // Set contract balance to 50USDT previously 100USDT
+        hevm.setUSDTBalance(address(this), suppliedUSDT - (50 * 1e6)); // Set contract balance to 50USDT previously 100USDT
         totalOutstandingDebt = (50 * 1e6);
 
         // 2. Interest accrued 10 USDT
@@ -384,7 +384,7 @@ contract RisedleVaultInternalTest is
         // Update the total supply first
         _burn(supplier, (100 * 1e6));
         _mint(supplier, (100 * 1e12 * 1e6));
-        hevm.setUSDCBalance(address(this), (50 * 1e12 * 1e6)); // Set contract balance to 50 trillion USDT
+        hevm.setUSDTBalance(address(this), (50 * 1e12 * 1e6)); // Set contract balance to 50 trillion USDT
         totalOutstandingDebt = (50 * 1e12 * 1e6); // 50 trillion USDT
         totalOutstandingDebt = totalOutstandingDebt + (9 * 1e12 * 1e6); // 9 trillion USDT (90% of interest accrued)
         totalPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)

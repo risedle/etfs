@@ -8,15 +8,14 @@
 // Copyright (c) 2021 Bayu - All rights reserved
 // github: pyk
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/SafeERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {FullMath} from "lib/v3-core/contracts/libraries/FullMath.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 import "./IRisedleVault.sol";
 
@@ -24,33 +23,33 @@ import "./IRisedleVault.sol";
 contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // The underlying assets address contract (ERC20)
+    /// @notice The underlying assets address contract (ERC20)
     address internal immutable underlying;
 
-    // The ETF's fee recipient address
+    /// @notice The ETF's fee recipient address
     address internal feeRecipient;
 
-    // The Risedle Vault address
+    /// @notice The Risedle Vault address
     address internal vault;
 
-    // To make sure that setupVault only run once
+    /// @notice To make sure that setupVault only run once
     bool internal vaultAdded;
 
-    // The ETF's initial price in term of vault's underlying address
-    // For example 100 USDT would be 100 * 1e6, coz USDT have 6 decimals
+    /// @notice The ETF's initial price in term of vault's underlying address
+    /// @dev For example 100 USDT would be 100 * 1e6, coz USDT have 6 decimals
     uint256 internal immutable INITIAL_ETF_PRICE;
 
-    // The ETF's creation and redemption fee in ether units
+    /// @notice The ETF's creation and redemption fee in ether units
     uint256 internal FEE_IN_ETHER = 0.001 ether; // 0.1% creation and redemption fee
 
-    // The ETF's pending fees
+    /// @notice The ETF's pending fees
     uint256 internal totalPendingCreationFees;
     uint256 internal totalPendingRedemptionFees;
 
-    // Event emitted when the vault is set
+    /// @notice Event emitted when the vault is set
     event ETFVaultConfigured(address setter, address vault);
 
-    // Event emitted when the fee recipient is updated
+    /// @notice Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newfeeRecipient);
 
     /**
@@ -172,7 +171,7 @@ contract RisedleETF is ERC20, Ownable, ReentrancyGuard {
         view
         returns (uint256 principalAmount, uint256 feeAmount)
     {
-        feeAmount = FullMath.mulDiv(amount, FEE_IN_ETHER, 1 ether);
+        feeAmount = (amount * FEE_IN_ETHER) / 1 ether;
         principalAmount = amount - feeAmount;
     }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
@@ -9,7 +9,7 @@ import {USDC_ADDRESS, USDC_SLOT, USDT_ADDRESS, USDT_SLOT, WETH_ADDRESS, WETH_SLO
 /// @notice Set Hevm interface, so we can use the cheat codes it in the test
 /// @dev https://github.com/dapphub/dapptools/tree/master/src/hevm#cheat-codes
 interface IHevm {
-    function addr(uint256 sk) external returns (address);
+    function addr(uint256 sk) external returns (address addr);
 
     function store(
         address c,

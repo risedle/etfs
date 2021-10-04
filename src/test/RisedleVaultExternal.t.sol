@@ -3,7 +3,7 @@
 // Risedle's Vault External Test
 // Test & validate user/contract interaction with Risedle's Vault
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
@@ -12,7 +12,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDC_ADDRESS} from "chain/Constants.sol";
+import {USDT_ADDRESS} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Lender} from "./Lender.sol";
@@ -21,7 +21,7 @@ import {RisedleVault} from "../RisedleVault.sol";
 
 contract RisedleVaultExternalTest is DSTest {
     // Test utils
-    IERC20 constant USDC = IERC20(USDC_ADDRESS);
+    IERC20 constant USDT = IERC20(USDT_ADDRESS);
     Hevm hevm;
 
     /// @notice Run the test setup
@@ -33,9 +33,10 @@ contract RisedleVaultExternalTest is DSTest {
     function createNewVault() internal returns (RisedleVault) {
         // Create new vault
         RisedleVault vault = new RisedleVault(
-            "Risedle USDC Vault",
-            "rvUSDC",
-            USDC_ADDRESS
+            "Risedle USDT Vault",
+            "rvUSDT",
+            USDT_ADDRESS,
+            6
         );
         return vault;
     }
@@ -48,9 +49,9 @@ contract RisedleVaultExternalTest is DSTest {
         // Create new lender
         Lender lender = new Lender(vault);
 
-        // Set the lender USDC balance
-        uint256 amount = 1000 * 1e6; // 1000 USDC
-        hevm.setUSDCBalance(address(lender), amount);
+        // Set the lender USDT balance
+        uint256 amount = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(lender), amount);
 
         // Lender add supply to the vault
         lender.lend(amount);
@@ -59,8 +60,8 @@ contract RisedleVaultExternalTest is DSTest {
         uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
         assertEq(lenderVaultTokenBalance, amount);
 
-        // The vault should receive the USDC
-        assertEq(USDC.balanceOf(address(vault)), amount);
+        // The vault should receive the USDT
+        assertEq(USDT.balanceOf(address(vault)), amount);
     }
 
     /// @notice Make sure the lender can remove asset from the vault
@@ -71,15 +72,15 @@ contract RisedleVaultExternalTest is DSTest {
         // Create new lender
         Lender lender = new Lender(vault);
 
-        // Set the lender USDC balance
-        uint256 amount = 1000 * 1e6; // 1000 USDC
-        hevm.setUSDCBalance(address(lender), amount);
+        // Set the lender USDT balance
+        uint256 amount = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(lender), amount);
 
         // Lender add supply to the vault
         lender.lend(amount);
 
         // Make sure the vault receive the asset
-        assertEq(USDC.balanceOf(address(vault)), amount);
+        assertEq(USDT.balanceOf(address(vault)), amount);
 
         // Lender remove supply from the vault
         lender.withdraw(amount);
@@ -88,11 +89,11 @@ contract RisedleVaultExternalTest is DSTest {
         uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
         assertEq(lenderVaultTokenBalance, 0);
 
-        // The lender should receive the USDC back
-        assertEq(USDC.balanceOf(address(lender)), amount);
+        // The lender should receive the USDT back
+        assertEq(USDT.balanceOf(address(lender)), amount);
 
-        // Not the vault should have zero USDC
-        assertEq(USDC.balanceOf(address(vault)), 0);
+        // Not the vault should have zero USDT
+        assertEq(USDT.balanceOf(address(vault)), 0);
     }
 
     /// @notice Make sure the lender earn interest
@@ -109,7 +110,7 @@ contract RisedleVaultExternalTest is DSTest {
         Borrower borrower = new Borrower(vault);
 
         // Set lender balance
-        hevm.setUSDCBalance(address(lender), 100 * 1e6); // 100 USDC
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
 
         // Supply asset to the vault
         lender.lend(100 * 1e6);
@@ -117,11 +118,11 @@ contract RisedleVaultExternalTest is DSTest {
         // Grant borrower access
         vault.setAsBorrower(address(borrower));
 
-        // Borrow 80 USDC
+        // Borrow 80 USDT
         borrower.borrow(80 * 1e6);
 
         // Utilization rate is 80%, borrow APY 19.45%
-        // After 5 days, the vault token should worth 100.175 USDC
+        // After 5 days, the vault token should worth 100.175 USDT
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
         uint256 expectedLenderVaultTokenWorth = 100175342;
 
@@ -150,8 +151,8 @@ contract RisedleVaultExternalTest is DSTest {
         Borrower borrower = new Borrower(vault);
 
         // Set lender balance
-        hevm.setUSDCBalance(address(lenderA), 100 * 1e6); // 100 USDC
-        hevm.setUSDCBalance(address(lenderB), 100 * 1e6); // 100 USDC
+        hevm.setUSDTBalance(address(lenderA), 100 * 1e6); // 100 USDT
+        hevm.setUSDTBalance(address(lenderB), 100 * 1e6); // 100 USDT
 
         // Lender A lend asset to the vault
         lenderA.lend(100 * 1e6);
@@ -159,7 +160,7 @@ contract RisedleVaultExternalTest is DSTest {
         // Grant borrower access
         vault.setAsBorrower(address(borrower));
 
-        // Borrow 80 USDC
+        // Borrow 80 USDT
         borrower.borrow(80 * 1e6);
 
         // Utilization rate is 80%, borrow APY 19.45%
@@ -169,15 +170,15 @@ contract RisedleVaultExternalTest is DSTest {
         // Lend & withdraw in the same timestamp
         // The lender B should not get the interest
         // Interest should automatically accrued when lender lend asset
-        lenderB.lend(100 * 1e6); // 100 USDC
+        lenderB.lend(100 * 1e6); // 100 USDT
         uint256 lenderBVaultTokenBalance = vault.balanceOf(address(lenderB));
 
         // Lender B redeem all vault tokens
         lenderB.withdraw(lenderBVaultTokenBalance);
 
-        // The lender B USDC balance should be back without interest
-        uint256 lenderBUSDCBalance = USDC.balanceOf(address(lenderB));
-        assertEq(lenderBUSDCBalance, 99999999); // 99.99 USDC Rounding down shares
+        // The lender B USDT balance should be back without interest
+        uint256 lenderBUSDTBalance = USDT.balanceOf(address(lenderB));
+        assertEq(lenderBUSDTBalance, 99999999); // 99.99 USDT Rounding down shares
     }
 
     /// @notice Borrower debt should increased when the interest is accrued
@@ -191,8 +192,8 @@ contract RisedleVaultExternalTest is DSTest {
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
-        hevm.setUSDCBalance(address(lender), 100 * 1e6); // 100 USDC
-        lender.lend(100 * 1e6); // 100 USDC
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
+        lender.lend(100 * 1e6); // 100 USDT
 
         // Create new authorized borrowers
         Borrower borrowerA = new Borrower(vault);
@@ -200,15 +201,15 @@ contract RisedleVaultExternalTest is DSTest {
         vault.setAsBorrower(address(borrowerA));
         vault.setAsBorrower(address(borrowerB));
 
-        // Borrower A borrow 40 USDC
+        // Borrower A borrow 40 USDT
         borrowerA.borrow(40 * 1e6);
         assertEq(vault.getOutstandingDebt(address(borrowerA)), 40 * 1e6);
 
         // Total debt should be correct
-        assertEq(vault.totalOutstandingDebt(), 40 * 1e6); // 40 USDC so far
+        assertEq(vault.totalOutstandingDebt(), 40 * 1e6); // 40 USDT so far
 
         // Total collected fees should be correct
-        assertEq(vault.totalPendingFees(), 0); // 0 USDC so far
+        assertEq(vault.totalPendingFees(), 0); // 0 USDT so far
 
         // After 5 days, then accrue interest
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
@@ -221,19 +222,19 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.getOutstandingDebt(address(borrowerA)), 40048706);
 
         // Total debt should be correct
-        assertEq(vault.totalOutstandingDebt(), 40048706); // 40.04870624 USDC so far
+        assertEq(vault.totalOutstandingDebt(), 40048706); // 40.04870624 USDT so far
 
-        // Borrower B borrow 50 USDC
+        // Borrower B borrow 50 USDT
         borrowerB.borrow(50 * 1e6);
 
         // The debt should correct
         assertEq(vault.getOutstandingDebt(address(borrowerB)), 50 * 1e6);
 
         // Total debt should be correct
-        assertEq(vault.totalOutstandingDebt(), 40048706 + (50 * 1e6)); // 90.04870624 USDC so far
+        assertEq(vault.totalOutstandingDebt(), 40048706 + (50 * 1e6)); // 90.04870624 USDT so far
 
         // Total collected fees should be correct
-        assertEq(vault.totalPendingFees(), 4870); // 0.004870624049 USDC so far
+        assertEq(vault.totalPendingFees(), 4870); // 0.004870624049 USDT so far
 
         // Next 5 days again
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 5));
@@ -244,15 +245,15 @@ contract RisedleVaultExternalTest is DSTest {
         // Total outstanding debt should be correct
         assertEq(vault.totalOutstandingDebt(), 90296100);
         assertEq(
-            vault.totalOutstandingDebt() + 1, // Rounding error 0.000001 USDC expected
+            vault.totalOutstandingDebt() + 1, // Rounding error 0.000001 USDT expected
             vault.getOutstandingDebt(address(borrowerA)) +
                 vault.getOutstandingDebt(address(borrowerB))
         );
 
         // Total outstanding debt for borrower A should be correct
-        assertEq(vault.getOutstandingDebt(address(borrowerA)), 40158734); // 40.15873349 USDC
+        assertEq(vault.getOutstandingDebt(address(borrowerA)), 40158734); // 40.15873349 USDT
 
         // Total outstanding debt for borrower A should be correct
-        assertEq(vault.getOutstandingDebt(address(borrowerB)), 50137367); // 50.1373668 USDC
+        assertEq(vault.getOutstandingDebt(address(borrowerB)), 50137367); // 50.1373668 USDT
     }
 }

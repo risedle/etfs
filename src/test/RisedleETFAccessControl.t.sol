@@ -2,7 +2,7 @@
 
 // Risedle's ETF External Test
 // Test & validate user/contract interaction with Risedle's ETF
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
@@ -11,14 +11,14 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {WETH_ADDRESS, USDC_ADDRESS} from "chain/Constants.sol";
+import {WETH_ADDRESS, USDT_ADDRESS} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {RisedleVault} from "../RisedleVault.sol";
 import {RisedleETF} from "../RisedleETF.sol";
 
 contract RisedleETFAccessControlTest is DSTest {
-    IERC20 constant USDC = IERC20(USDC_ADDRESS);
+    IERC20 constant USDT = IERC20(USDT_ADDRESS);
     IERC20 constant WETH = IERC20(WETH_ADDRESS);
 
     // HEVM
@@ -33,9 +33,10 @@ contract RisedleETFAccessControlTest is DSTest {
     function createNewVault() internal returns (RisedleVault) {
         // Create new vault
         RisedleVault vault = new RisedleVault(
-            "Risedle USDC Vault",
-            "rvUSDC",
-            USDC_ADDRESS
+            "Risedle USDT Vault",
+            "rvUSDT",
+            USDT_ADDRESS,
+            6
         );
         return vault;
     }
@@ -62,7 +63,7 @@ contract RisedleETFAccessControlTest is DSTest {
         RisedleVault vault = createNewVault();
 
         // Create new ETF
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
 
@@ -83,7 +84,7 @@ contract RisedleETFAccessControlTest is DSTest {
         RisedleVault vault = createNewVault();
 
         // Create new ETF
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
 
@@ -102,7 +103,7 @@ contract RisedleETFAccessControlTest is DSTest {
         // Create new vault
         RisedleVault vault = createNewVault();
         // Create new ETF
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice);
         etf.transferOwnership(governor);
         etf.setVault(address(vault));
@@ -118,7 +119,7 @@ contract RisedleETFAccessControlTest is DSTest {
         RisedleVault vault = createNewVault();
 
         // Create new ETF
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice); // This contract as the governor
         etf.setVault(address(vault));
 
@@ -141,7 +142,7 @@ contract RisedleETFAccessControlTest is DSTest {
     function testFail_NonGovernorCannotUpdateFee() public {
         // Create new ETF
         address governor = hevm.addr(2); // set random address as governor
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice);
 
         // Transfer the ownership to new governor
@@ -155,7 +156,7 @@ contract RisedleETFAccessControlTest is DSTest {
     /// @notice Make sure governor can update the fee
     function test_GovernorCanUpdateFee() public {
         // Create new ETF
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
         RisedleETF etf = createNewETF(initialPrice);
 
         // Call the setFee as governor

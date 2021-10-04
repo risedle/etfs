@@ -3,16 +3,16 @@
 // Risedle's ETF Internal Test
 // Test & validate all internal functionalities
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
-import {IERC20Metadata} from "../IERC20Metadata.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {WETH_ADDRESS, USDC_ADDRESS} from "chain/Constants.sol";
+import {WETH_ADDRESS, USDT_ADDRESS} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {RisedleVault} from "../RisedleVault.sol";
@@ -22,18 +22,19 @@ import {RisedleETF} from "../RisedleETF.sol";
 string constant etfTokenName = "ETH 2x Leverage Risedle";
 string constant etfTokenSymbol = "ETHRISE";
 address constant wethAddress = WETH_ADDRESS;
-uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDC
+uint256 constant etfInitialPrice = 100 * 1e6; // 100 USDT
 
 // Set Risedle's Vault properties
-string constant vaultTokenName = "Risedle USDC Vault";
-string constant vaultTokenSymbol = "rvUSDC";
-address constant vaultUnderlyingAddress = USDC_ADDRESS;
+string constant vaultTokenName = "Risedle USDT Vault";
+string constant vaultTokenSymbol = "rvUSDT";
+address constant vaultUnderlyingAddress = USDT_ADDRESS;
+uint8 constant vaultUnderlyingDecimals = 6;
 
 contract RisedleETFInternalTest is
     DSTest,
     RisedleETF(etfTokenName, etfTokenSymbol, wethAddress, etfInitialPrice)
 {
-    // hevm utils to alter mainnet state
+    /// @notice hevm utils to alter mainnet state
     Hevm hevm;
 
     RisedleVault etfVault;
@@ -46,7 +47,8 @@ contract RisedleETFInternalTest is
         etfVault = new RisedleVault(
             vaultTokenName,
             vaultTokenSymbol,
-            vaultUnderlyingAddress
+            vaultUnderlyingAddress,
+            vaultUnderlyingDecimals
         );
 
         // Set the vault
@@ -78,7 +80,7 @@ contract RisedleETFInternalTest is
         IERC20Metadata etfTokenMetadata = IERC20Metadata(address(this));
         assertEq(etfTokenMetadata.name(), etfTokenName);
         assertEq(etfTokenMetadata.symbol(), etfTokenSymbol);
-        assertEq(uint256(etfTokenMetadata.decimals()), 18); // Default decimals
+        assertEq(etfTokenMetadata.decimals(), 18); // Default decimals
 
         // Make sure the total supply is set to zero
         assertEq(totalSupply(), 0);

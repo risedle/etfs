@@ -11,7 +11,7 @@
 // Copyright (c) 2021 Bayu - All rights reserved
 // github: pyk
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 interface IRisedleVault {

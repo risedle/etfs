@@ -3,17 +3,17 @@
 // Risedle's Vault Access Control Test
 // Make sure the Governor ownership is working as expected
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/SafeERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDC_ADDRESS} from "chain/Constants.sol";
+import {USDT_ADDRESS} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Lender} from "./Lender.sol";
@@ -35,7 +35,7 @@ contract FeeCollector {
 
 contract RisedleVaultAccessControlTest is DSTest {
     // Test utils
-    IERC20 constant USDC = IERC20(USDC_ADDRESS);
+    IERC20 constant USDT = IERC20(USDT_ADDRESS);
     Hevm hevm;
 
     /// @notice Run the test setup
@@ -47,9 +47,10 @@ contract RisedleVaultAccessControlTest is DSTest {
     function createNewVault() internal returns (RisedleVault) {
         // Create new vault
         RisedleVault vault = new RisedleVault(
-            "Risedle USDC Vault",
-            "rvUSDC",
-            USDC_ADDRESS
+            "Risedle USDT Vault",
+            "rvUSDT",
+            USDT_ADDRESS,
+            6
         );
         return vault;
     }
@@ -102,13 +103,13 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
-        hevm.setUSDCBalance(address(lender), 1000 * 1e6); // 1000 USDC
-        lender.lend(1000 * 1e6); // 1000 USDC
+        hevm.setUSDTBalance(address(lender), 1000 * 1e6); // 1000 USDT
+        lender.lend(1000 * 1e6); // 1000 USDT
 
         // Unauthorized borrower borrow from the vault
         // This should be failed
         Borrower unauthorizedBorrower = new Borrower(vault);
-        unauthorizedBorrower.borrow(100 * 1e6); // 100 USDC
+        unauthorizedBorrower.borrow(100 * 1e6); // 100 USDT
     }
 
     /// @notice Make sure authorized borrower can borrow
@@ -118,8 +119,8 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
-        uint256 supplyAmount = 1000 * 1e6; // 1000 USDC
-        hevm.setUSDCBalance(address(lender), supplyAmount);
+        uint256 supplyAmount = 1000 * 1e6; // 1000 USDT
+        hevm.setUSDTBalance(address(lender), supplyAmount);
         lender.lend(supplyAmount);
 
         // Authorized borrower borrow from the vault
@@ -128,7 +129,7 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Borrow underlying asset
         uint256 borrowAmount = 100 * 1e6;
-        authorizedBorrower.borrow(borrowAmount); // 100 USDC
+        authorizedBorrower.borrow(borrowAmount); // 100 USDT
 
         // Make sure the vault states are updated
         assertEq(vault.totalOutstandingDebt(), borrowAmount);
@@ -138,10 +139,10 @@ contract RisedleVaultAccessControlTest is DSTest {
         );
 
         // Make sure the underlying asset is transfered to the borrower
-        assertEq(USDC.balanceOf(address(authorizedBorrower)), borrowAmount);
+        assertEq(USDT.balanceOf(address(authorizedBorrower)), borrowAmount);
 
-        // Make sure the vault USDC is reduced
-        assertEq(USDC.balanceOf(address(vault)), supplyAmount - borrowAmount);
+        // Make sure the vault USDT is reduced
+        assertEq(USDT.balanceOf(address(vault)), supplyAmount - borrowAmount);
     }
 
     /// @notice Make sure unauthorized borrower cannot repay
@@ -151,10 +152,10 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Unauthorized borrower repay from the vault
         Borrower unauthorizedBorrower = new Borrower(vault);
-        hevm.setUSDCBalance(address(unauthorizedBorrower), 100 * 1e6); // 100 USDC
+        hevm.setUSDTBalance(address(unauthorizedBorrower), 100 * 1e6); // 100 USDT
 
         // This should be failed
-        unauthorizedBorrower.repay(100 * 1e6); // 100 USDC
+        unauthorizedBorrower.repay(100 * 1e6); // 100 USDT
     }
 
     /// @notice Make sure authorized borrower can borrow
@@ -169,16 +170,16 @@ contract RisedleVaultAccessControlTest is DSTest {
         // Add supply to the vault
         uint256 supplyAmount = 1000 * 1e6;
         Lender lender = new Lender(vault);
-        hevm.setUSDCBalance(address(lender), supplyAmount); // 1000 USDC
-        lender.lend(supplyAmount); // 1000 USDC
+        hevm.setUSDTBalance(address(lender), supplyAmount); // 1000 USDT
+        lender.lend(supplyAmount); // 1000 USDT
 
         // Authorized borrower borrow from the vault
         Borrower authorizedBorrower = new Borrower(vault);
         vault.setAsBorrower(address(authorizedBorrower));
 
         // Borrow underlying asset
-        uint256 borrowAmount = 100 * 1e6; // 100 USDC
-        uint256 repayAmount = 50 * 1e6; // 50 USDC
+        uint256 borrowAmount = 100 * 1e6; // 100 USDT
+        uint256 repayAmount = 50 * 1e6; // 50 USDT
         authorizedBorrower.borrow(borrowAmount);
 
         // Repay underlying asset
@@ -186,11 +187,11 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Make sure the underlying asset is transfered to the borrower & the vault
         assertEq(
-            USDC.balanceOf(address(authorizedBorrower)),
+            USDT.balanceOf(address(authorizedBorrower)),
             borrowAmount - repayAmount
         );
         assertEq(
-            USDC.balanceOf(address(vault)),
+            USDT.balanceOf(address(vault)),
             supplyAmount - (borrowAmount - repayAmount)
         );
 
@@ -291,15 +292,15 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         // Add supply to the vault
         Lender lender = new Lender(vault);
-        hevm.setUSDCBalance(address(lender), 100 * 1e6); // 100 USDC
-        lender.lend(100 * 1e6); // 100 USDC
+        hevm.setUSDTBalance(address(lender), 100 * 1e6); // 100 USDT
+        lender.lend(100 * 1e6); // 100 USDT
 
         // Create new authorized borrowers
         Borrower borrower = new Borrower(vault);
         vault.setAsBorrower(address(borrower));
 
         // Borrow asset
-        borrower.borrow(90 * 1e6); // Borrow 90 USDC
+        borrower.borrow(90 * 1e6); // Borrow 90 USDT
 
         // Change the timestamp to 7 days
         hevm.warp(previousTimestamp + (60 * 60 * 24 * 7));
@@ -318,7 +319,7 @@ contract RisedleVaultAccessControlTest is DSTest {
         assertEq(vault.totalPendingFees(), 0);
 
         // Make sure the fee recipient have collectedFees balance
-        assertEq(USDC.balanceOf(feeRecipient), collectedFees);
+        assertEq(USDT.balanceOf(feeRecipient), collectedFees);
     }
 
     /// @notice Test accrue interest as public
