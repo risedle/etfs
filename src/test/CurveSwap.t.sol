@@ -7,7 +7,7 @@ import "lib/ds-test/src/test.sol";
 import {CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, USDC_ADDRESS, WETH_ADDRESS, USDT_ADDRESS} from "chain/Constants.sol";
 import {IAddressProvider, ISwap, IRegistry} from "../interfaces/Curve.sol";
 
-/// @notice Playground to play around with Uniswap V3 contract
+/// @notice Playground to play around with Curve contract
 contract CurveSwapTest is DSTest {
     function test_SwapUSDCToWETH() public {
         // Gimana cara swap USDC ke WETH
