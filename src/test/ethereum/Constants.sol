@@ -26,3 +26,6 @@ uint256 constant WETH_SLOT = 3;
 // Chainlink feeds
 address constant CHAINLINK_ETH_USD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
 address constant CHAINLINK_USDC_USD = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+
+// Uniswap V3
+address constant UNISWAPV3_SWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
