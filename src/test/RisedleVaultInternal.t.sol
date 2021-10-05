@@ -114,44 +114,152 @@ contract RisedleVaultInternalTest is
     }
 
     /// @notice Make sure the Utilization Rate calculation is correct
-    function test_GetUtilizationRateInEther() public {
+    function test_CalculateUtilizationRateInEther() public {
         uint256 utilizationRateInEther;
 
         // Available=0 ; Outstanding debt=0
-        utilizationRateInEther = getUtilizationRateInEther(0, 0);
+        utilizationRateInEther = calculateUtilizationRateInEther(0, 0);
         assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Outstanding debt=0
-        utilizationRateInEther = getUtilizationRateInEther(100 * 1e6, 0);
+        utilizationRateInEther = calculateUtilizationRateInEther(100 * 1e6, 0);
         assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Outstanding debt=50 USDT
-        utilizationRateInEther = getUtilizationRateInEther(
+        utilizationRateInEther = calculateUtilizationRateInEther(
             100 * 1e6, // 100 USDT
             50 * 1e6 // 50 USDT
         );
         assertEq(utilizationRateInEther, 333333333333333333); // 0.33 Utilization rate
 
         // Available=50 USDT; Outstanding debt=100 USDT
-        utilizationRateInEther = getUtilizationRateInEther(
+        utilizationRateInEther = calculateUtilizationRateInEther(
             50 * 1e6, // 50 USDT
             100 * 1e6 // 100 USDT
         );
         assertEq(utilizationRateInEther, 666666666666666666); // 0.66 Utilization rate
 
         // Available=0; Outstanding debt=100 USDT
-        utilizationRateInEther = getUtilizationRateInEther(0, 100 * 1e6);
+        utilizationRateInEther = calculateUtilizationRateInEther(0, 100 * 1e6);
         assertEq(utilizationRateInEther, 1 ether);
 
         // Test with very large number
-        utilizationRateInEther = getUtilizationRateInEther(
+        utilizationRateInEther = calculateUtilizationRateInEther(
             100 * 1e12 * 1e6, // 100 trillion USDT
             100 * 1e12 * 1e6 // 100 trillion USDT
         );
         assertEq(utilizationRateInEther, 0.5 ether);
     }
 
+    /// @notice Make sure getUtilizationRateInEther is correct
+    function test_GetUtilizationRateInEther() public {
+        uint256 utilizationRateInEther;
+
+        // Set all balance to zero
+        totalOutstandingDebt = 0;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 0);
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 0);
+
+        // Available=100 USDT; Outstanding debt=0
+        totalOutstandingDebt = 0;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 100 * 1e6);
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 0);
+
+        // Available=100 USDT; Outstanding debt=50 USDT
+        totalOutstandingDebt = 50 * 1e6;
+        totalPendingFees = 10 * 1e6;
+        hevm.setUSDTBalance(address(this), 110 * 1e6);
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 333333333333333333); // 0.33 Utilization rate
+
+        // Available=50 USDT; Outstanding debt=100 USDT
+        totalOutstandingDebt = 100 * 1e6;
+        totalPendingFees = 50 * 1e6;
+        hevm.setUSDTBalance(address(this), 100 * 1e6);
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 666666666666666666); // 0.66 Utilization rate
+
+        // Available=0; Outstanding debt=100 USDT
+        totalOutstandingDebt = 100 * 1e6;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 0);
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 1 ether); // 1.0 utilization rate
+
+        // Test with very large number
+        totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 100 * 1e12 * 1e6); // 100 trillion USDT
+        utilizationRateInEther = getUtilizationRateInEther();
+        assertEq(utilizationRateInEther, 0.5 ether); // 0.5 utilization rate
+    }
+
     /// @notice Make sure the borrow rate calculation is correct
+    function test_CalculateBorrowRatePerSecondInEther() public {
+        // Set the model parameters
+        OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
+        INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
+        INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
+        uint256 borrowRatePerSecondInEther;
+
+        // Initial state: 0 utilization
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(0);
+        assertEq(borrowRatePerSecondInEther, 0);
+
+        // 0.5 utilization rate (50%)
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            0.5 ether
+        );
+        assertEq(borrowRatePerSecondInEther, 3523310220); // approx 11.75% APY
+
+        // 0.94 utilization rate (94%)
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            0.94 ether
+        );
+        assertEq(borrowRatePerSecondInEther, 19025875190); // approx 82.122% APY
+
+        // 0.97 utilization rate (97%)
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            0.97 ether
+        );
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
+
+        // 0.99 utilization rate (99%)
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            0.99 ether
+        );
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
+
+        // 1.0 utilization rate (100%)
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            1 ether
+        ); // 100%
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
+
+        // More than 100% utilization rate should be capped to max borrow rate
+        borrowRatePerSecondInEther = calculateBorrowRatePerSecondInEther(
+            1.5 ether
+        ); // 150%
+        assertEq(
+            borrowRatePerSecondInEther,
+            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+        ); // approx 393% APY
+    }
+
+    /// @notice Make sure getBorrowRatePerSecondInEther is correct
     function test_GetBorrowRatePerSecondInEther() public {
         // Set the model parameters
         OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
@@ -160,44 +268,40 @@ contract RisedleVaultInternalTest is
         uint256 borrowRatePerSecondInEther;
 
         // Initial state: 0 utilization
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0);
+        totalOutstandingDebt = 0;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 0);
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(borrowRatePerSecondInEther, 0);
 
         // 0.5 utilization rate (50%)
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.5 ether);
+        totalOutstandingDebt = 100 * 1e6;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 100 * 1e6);
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(borrowRatePerSecondInEther, 3523310220); // approx 11.75% APY
 
-        // 0.94 utilization rate (94%)
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.94 ether);
-        assertEq(borrowRatePerSecondInEther, 19025875190); // approx 82.122% APY
-
-        // 0.97 utilization rate (97%)
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.97 ether);
-        assertEq(
-            borrowRatePerSecondInEther,
-            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
-        ); // approx 393% APY
-
-        // 0.99 utilization rate (99%)
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(0.99 ether);
-        assertEq(
-            borrowRatePerSecondInEther,
-            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
-        ); // approx 393% APY
-
         // 1.0 utilization rate (100%)
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(1 ether); // 100%
+        totalOutstandingDebt = 100 * 1e6;
+        totalPendingFees = 0;
+        hevm.setUSDTBalance(address(this), 0);
+        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(
             borrowRatePerSecondInEther,
             MAX_BORROW_RATE_PER_SECOND_IN_ETHER
         ); // approx 393% APY
+    }
 
-        // More than 100% utilization rate should be capped to max borrow rate
-        borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(1.5 ether); // 150%
-        assertEq(
-            borrowRatePerSecondInEther,
-            MAX_BORROW_RATE_PER_SECOND_IN_ETHER
-        ); // approx 393% APY
+    /// @notice Make sure the getSupplyRatePerSecondInEther is correct
+    function test_GetSupplyRatePerSecondInEther() public {
+        // Test with 76% utilization rate
+        totalOutstandingDebt = 100 * 1e6;
+        totalPendingFees = 20 * 1e6;
+        hevm.setUSDTBalance(address(this), 50 * 1e6);
+        uint256 borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
+        assertEq(borrowRatePerSecondInEther, 5420477262); // approx 18% APY
+        uint256 supplyRatePerSecondInEther = getSupplyRatePerSecondInEther();
+        assertEq(supplyRatePerSecondInEther, 3752638103); // approx 12% APY
     }
 
     /// @notice Make sure getInterestAmount is correct
