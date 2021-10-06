@@ -438,7 +438,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
      *         in term of underlying asset.
      * @return The exchange rates in ether units
      */
-    function getExchangeRateInEther() internal view returns (uint256) {
+    function getExchangeRateInEther() public view returns (uint256) {
         uint256 totalSupply = totalSupply();
 
         if (totalSupply == 0) {
@@ -453,19 +453,6 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
                 totalSupply;
             return exchangeRateInEther;
         }
-    }
-
-    /**
-     * @notice getCurrentExchangeRateInEther returns the up-to-date exchange rate
-     * @return Exchange rate in ether units
-     */
-    function getCurrentExchangeRateInEther()
-        external
-        nonReentrant
-        returns (uint256)
-    {
-        accrueInterest();
-        return getExchangeRateInEther();
     }
 
     /**

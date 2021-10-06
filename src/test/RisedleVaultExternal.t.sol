@@ -127,7 +127,8 @@ contract RisedleVaultExternalTest is DSTest {
         uint256 expectedLenderVaultTokenWorth = 100175342;
 
         // Get the current exchange rate
-        uint256 exhangeRateInEther = vault.getCurrentExchangeRateInEther();
+        vault.accrueInterest();
+        uint256 exhangeRateInEther = vault.getExchangeRateInEther();
         uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
         uint256 lenderVaultTokenWorth = (lenderVaultTokenBalance *
             exhangeRateInEther) / 1 ether;
