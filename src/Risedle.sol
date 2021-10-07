@@ -742,4 +742,21 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     function getETFInfo(address etf) external view returns (ETFInfo memory) {
         return etfs[etf];
     }
+
+    /**
+     * @notice getPrincipalAndFeeAmount splits principal and fee amount
+     * @param amount The amount of ETF underlying asset deposited by the investor
+     * @param feeInEther The ETF fee in ether units (e.g. 0.001 ether = 0.1%)
+     * @return principalAmount The principal amount
+     * @return feeAmount The fee amount collected by the protocol
+     */
+    function getPrincipalAndFeeAmount(uint256 amount, uint256 feeInEther)
+        internal
+        view
+        returns (uint256 principalAmount, uint256 feeAmount)
+    {
+        feeAmount = (amount * feeInEther) / 1 ether;
+        principalAmount = amount - feeAmount;
+    }
+
 }
