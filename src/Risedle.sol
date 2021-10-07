@@ -20,6 +20,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {IChainlinkAggregatorV3} from "./interfaces/Chainlink.sol";
 
 /// @title Risedle
 contract Risedle is ERC20, Ownable, ReentrancyGuard {
@@ -757,6 +758,29 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     {
         feeAmount = (amount * feeInEther) / 1 ether;
         principalAmount = amount - feeAmount;
+    }
+
+    /**
+     * @notice getChainlinkPriceInGwei returns the latest price from chainlink in term of USD
+     * @return priceInGwei The USD price in Gwei units
+     */
+    function getChainlinkPriceInGwei(address feed)
+        internal
+        view
+        returns (uint256 priceInGwei)
+    {
+        // Get latest price
+        (, int256 price, , , ) = IChainlinkAggregatorV3(feed).latestRoundData();
+
+        // Get feed decimals representation
+        uint8 feedDecimals = IChainlinkAggregatorV3(feed).decimals();
+
+        // Scaleup or scaledown the decimals
+        if (feedDecimals != 9) {
+            priceInGwei = (uint256(price) * 1 gwei) / 10**feedDecimals;
+        } else {
+            priceInGwei = uint256(price);
+        }
     }
 
 }
