@@ -26,9 +26,6 @@ import {IChainlinkAggregatorV3} from "./interfaces/Chainlink.sol";
 contract Risedle is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @notice To keep track the authorized borrower
-    mapping(address => bool) private _isBorrower;
-
     /// @notice The Vault's underlying asset
     address public immutable supply;
 
@@ -656,19 +653,19 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getPrincipalAndFeeAmount splits principal and fee amount
+     * @notice getCollateralAndFeeAmount splits collateral and fee amount
      * @param amount The amount of ETF underlying asset deposited by the investor
      * @param feeInEther The ETF fee in ether units (e.g. 0.001 ether = 0.1%)
-     * @return principalAmount The principal amount
+     * @return collateralAmount The collateral amount
      * @return feeAmount The fee amount collected by the protocol
      */
-    function getPrincipalAndFeeAmount(uint256 amount, uint256 feeInEther)
+    function getCollateralAndFeeAmount(uint256 amount, uint256 feeInEther)
         internal
         view
-        returns (uint256 principalAmount, uint256 feeAmount)
+        returns (uint256 collateralAmount, uint256 feeAmount)
     {
         feeAmount = (amount * feeInEther) / 1 ether;
-        principalAmount = amount - feeAmount;
+        collateralAmount = amount - feeAmount;
     }
 
     /**

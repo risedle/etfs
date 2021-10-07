@@ -528,35 +528,35 @@ contract RisedleInternalTest is
     }
 
     /// @notice Make sure the fee calculation is correct
-    function test_GetPrincipalAndFeeAmount() public {
+    function test_GetCollateralAndFeeAmount() public {
         uint256 amount;
         uint256 feeInEther;
-        uint256 outputPrincipalAmount;
+        uint256 outputCollateralAmount;
         uint256 outputFeeAmount;
-        uint256 expectedPrincipalAmount;
+        uint256 expectedCollateralAmount;
         uint256 expectedFeeAmount;
 
         amount = 50 ether;
         feeInEther = 0.001 ether; // 0.1%
-        expectedPrincipalAmount = 49.95 ether;
+        expectedCollateralAmount = 49.95 ether;
         expectedFeeAmount = 0.05 ether;
-        (outputPrincipalAmount, outputFeeAmount) = getPrincipalAndFeeAmount(
+        (outputCollateralAmount, outputFeeAmount) = getCollateralAndFeeAmount(
             amount,
             feeInEther
         );
-        assertEq(outputPrincipalAmount, expectedPrincipalAmount);
+        assertEq(outputCollateralAmount, expectedCollateralAmount);
         assertEq(outputFeeAmount, expectedFeeAmount);
 
         // Test with very large number
         amount = (120 * 1e12) * 1 ether; // 120 trillion ether
         feeInEther = 0.001 ether; // 0.1%
-        expectedPrincipalAmount = (11988 * 1e10) * 1 ether;
+        expectedCollateralAmount = (11988 * 1e10) * 1 ether;
         expectedFeeAmount = (12 * 1e10) * 1 ether;
-        (outputPrincipalAmount, outputFeeAmount) = getPrincipalAndFeeAmount(
+        (outputCollateralAmount, outputFeeAmount) = getCollateralAndFeeAmount(
             amount,
             feeInEther
         );
-        assertEq(outputPrincipalAmount, expectedPrincipalAmount);
+        assertEq(outputCollateralAmount, expectedCollateralAmount);
         assertEq(outputFeeAmount, expectedFeeAmount);
     }
 
