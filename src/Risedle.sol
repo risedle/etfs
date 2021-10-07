@@ -73,6 +73,17 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     /// @notice Timestamp that interest was last accrued at
     uint256 internal lastTimestampInterestAccrued;
 
+    /// @notice ETFInfo contains information of the ETF
+    struct ETFInfo {
+        address underlying; // ETF underlying asset (e.g. WETH address)
+        address feed; // Chainlink feed (e.g. ETH/USD)
+        uint256 initialPrice; // In term of vault's underlying asset (e.g. 100 USDC -> 100 * 1e6, coz is 6 decimals for USDC)
+        address token; // Address of ETF token ERC20, make sure this vault can mint & burn this token
+    }
+
+    /// @notice Mapping ETF token to their information
+    mapping(address => ETFInfo) etfs;
+
     /// @notice Event emitted when the interest succesfully accrued
     event InterestAccrued(
         uint256 previousTimestamp,
@@ -691,5 +702,40 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         feeRecipient = account;
 
         emit FeeRecipientUpdated(msg.sender, account);
+    }
+
+    /**
+     * @notice createNewETF creates new ETF
+     * @dev Only governor can create new ETF
+     * @param etfUnderlying The underlying token of ETF (e.g. WETH)
+     * @param chainlinkFeed Chainlink feed (e.g. ETH/USD)
+     * @param initialPrice Initial price of the ETF based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
+     * @param etfToken The ETF token, this contract should have access to mint & burn
+     */
+    function createNewETF(
+        address etfUnderlying,
+        address chainlinkFeed,
+        uint256 initialPrice,
+        address etfToken
+    ) external onlyOwner {
+        // Create new ETF info
+        ETFInfo memory info = ETFInfo(
+            etfUnderlying,
+            chainlinkFeed,
+            initialPrice,
+            etfToken
+        );
+
+        // Map new info to their token
+        etfs[etfToken] = info;
+    }
+
+    /**
+     * @notice getETFInfo returns information about the etf
+     * @param etf The address of the ETF token
+     * @return info The ETF information
+     */
+    function getETFInfo(address etf) external view returns (ETFInfo memory) {
+        return etfs[etf];
     }
 }
