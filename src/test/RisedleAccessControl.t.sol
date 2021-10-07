@@ -162,10 +162,11 @@ contract RisedleAccessControlTest is DSTest {
 
         // Make sure this action is failed
         vault.createNewETF(
+            hevm.addr(2),
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             100 * 1e6,
-            hevm.addr(2)
+            0.001 ether // 0.1% creation and redemption fee
         );
     }
 
@@ -177,11 +178,13 @@ contract RisedleAccessControlTest is DSTest {
         // Create new ETF as governance
         uint256 initialPrice = 100 * 1e6; // 100 USDT
         address etfToken = hevm.addr(1); // Set random address
+        uint256 feeInEther = 0.001 ether; // 0.1% creation and redemption fee
         vault.createNewETF(
+            etfToken,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             initialPrice,
-            etfToken
+            feeInEther
         );
 
         // Get the ETF info
@@ -192,5 +195,6 @@ contract RisedleAccessControlTest is DSTest {
         assertEq(info.feed, CHAINLINK_ETH_USD);
         assertEq(info.initialPrice, initialPrice);
         assertEq(info.token, etfToken);
+        assertEq(info.feeInEther, feeInEther);
     }
 }
