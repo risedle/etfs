@@ -13,7 +13,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDT_ADDRESS} from "chain/Constants.sol";
+import {USDT_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
@@ -151,5 +151,46 @@ contract RisedleAccessControlTest is DSTest {
 
         // Make sure is not failed
         assertTrue(true);
+    }
+
+    /// @notice Only governance can create new ETF
+    function testFail_NonGovernanceCannotCreateNewETF() public {
+        // Create new vault
+        address governance = hevm.addr(2);
+        Risedle vault = createNewVault();
+        vault.transferOwnership(governance);
+
+        // Make sure this action is failed
+        vault.createNewETF(
+            WETH_ADDRESS,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            hevm.addr(2)
+        );
+    }
+
+    /// @notice Governance can create new ETF
+    function test_GovernanceCanCreateNewETF() public {
+        // Create new vault as governance
+        Risedle vault = createNewVault();
+
+        // Create new ETF as governance
+        uint256 initialPrice = 100 * 1e6; // 100 USDT
+        address etfToken = hevm.addr(1); // Set random address
+        vault.createNewETF(
+            WETH_ADDRESS,
+            CHAINLINK_ETH_USD,
+            initialPrice,
+            etfToken
+        );
+
+        // Get the ETF info
+        Risedle.ETFInfo memory info = vault.getETFInfo(etfToken);
+
+        // Make sure the info is correct
+        assertEq(info.underlying, WETH_ADDRESS);
+        assertEq(info.feed, CHAINLINK_ETH_USD);
+        assertEq(info.initialPrice, initialPrice);
+        assertEq(info.token, etfToken);
     }
 }
