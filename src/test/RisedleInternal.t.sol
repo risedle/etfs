@@ -15,7 +15,7 @@ import {Risedle} from "../Risedle.sol";
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDT_ADDRESS} from "chain/Constants.sol";
+import {USDT_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD} from "chain/Constants.sol";
 
 // Set Risedle's Vault properties
 string constant vaultTokenName = "Risedle USDT Vault";
@@ -556,5 +556,19 @@ contract RisedleInternalTest is
         );
         assertEq(outputPrincipalAmount, expectedPrincipalAmount);
         assertEq(outputFeeAmount, expectedFeeAmount);
+    }
+
+    /// @notice Make sure we can get correct data from chainlink
+    function test_GetChainlinkPriceInGwei() public {
+        uint256 priceInGwei;
+
+        // Test with ETH/USD feed
+        priceInGwei = getChainlinkPriceInGwei(CHAINLINK_ETH_USD);
+        assertGt(priceInGwei, 2700 gwei); // 2700 USD ETH UP ONLY
+
+        // Test with USDC/USD feed
+        priceInGwei = getChainlinkPriceInGwei(CHAINLINK_USDC_USD);
+        assertGt(priceInGwei, 0.9 gwei);
+        assertLt(priceInGwei, 1.1 gwei);
     }
 }
