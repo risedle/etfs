@@ -13,7 +13,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD} from "chain/Constants.sol";
+import {USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, UNISWAPV3_SWAP_ROUTER} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
@@ -49,7 +49,8 @@ contract RisedleAccessControlTest is DSTest {
             "rvUSDC",
             USDC_ADDRESS,
             CHAINLINK_USDC_USD,
-            6
+            6,
+            UNISWAPV3_SWAP_ROUTER
         );
         return vault;
     }
@@ -167,7 +168,8 @@ contract RisedleAccessControlTest is DSTest {
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             100 * 1e6,
-            0.001 ether // 0.1% creation and redemption fee
+            0.001 ether, // 0.1% creation and redemption fee,
+            500 // Uniswap V3 pool fee
         );
     }
 
@@ -185,7 +187,8 @@ contract RisedleAccessControlTest is DSTest {
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             initialPrice,
-            feeInEther
+            feeInEther,
+            500 // Uniswap V3 pool fee
         );
 
         // Get the ETF info

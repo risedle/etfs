@@ -21,6 +21,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {IChainlinkAggregatorV3} from "./interfaces/Chainlink.sol";
+import {ISwapRouter} from "./interfaces/UniswapV3.sol";
 
 /// @title Risedle
 contract Risedle is ERC20, Ownable, ReentrancyGuard {
@@ -34,6 +35,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice The Vault's fee recipient address
     address internal feeRecipient;
+
+    /// @notice The Uniswap V3 router address
+    address internal immutable uniswapV3SwapRouter;
 
     /// @notice The vault token decimals
     uint8 private immutable _decimals;
@@ -81,6 +85,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         address feed; // Chainlink feed (e.g. ETH/USD)
         uint256 initialPrice; // In term of vault's underlying asset (e.g. 100 USDC -> 100 * 1e6, coz is 6 decimals for USDC)
         uint256 feeInEther; // Creation and redemption fee in ether units
+        uint24 uniswapV3PoolFee; // Uniswap V3 Pool fee https://docs.uniswap.org/sdk/reference/enums/FeeAmount
     }
 
     /// @notice Mapping ETF token to their information
@@ -152,13 +157,15 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @param supply_ The Vault's underlying asset
      * @param supplyFeed_ The Vault's underlying asset Chainlink feed per USD (e.g. USDC/USD)
      * @param supplyDecimals_ The Vault's underlying asset decimal
+     * @param uniswapV3SwapRouter_ The Uniswap V3 router address
      */
     constructor(
         string memory name,
         string memory symbol,
         address supply_,
         address supplyFeed_,
-        uint8 supplyDecimals_
+        uint8 supplyDecimals_,
+        address uniswapV3SwapRouter_
     ) ERC20(name, symbol) {
         // Set supply asset contract address
         supply = supply_;
@@ -174,6 +181,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Initialize the last timestamp accrued
         lastTimestampInterestAccrued = block.timestamp;
+
+        // Set Uniswap V3 router address
+        uniswapV3SwapRouter = uniswapV3SwapRouter_;
     }
 
     /// @notice Overwrite the vault token decimals
@@ -628,7 +638,8 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         address underlying_,
         address chainlinkFeed,
         uint256 initialPrice,
-        uint256 feeInEther
+        uint256 feeInEther,
+        uint24 uniswapV3PoolFee
     ) external onlyOwner {
         // Create new ETF info
         ETFInfo memory info = ETFInfo(
@@ -636,7 +647,8 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             underlying_,
             chainlinkFeed,
             initialPrice,
-            feeInEther
+            feeInEther,
+            uniswapV3PoolFee
         );
 
         // Map new info to their token
@@ -719,6 +731,41 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      */
     function getPriceThreshold(uint256 amount) internal pure returns (uint256) {
         return (0.0009 ether * amount) / 1 ether;
+    }
+
+    /**
+     * @notice buyCollateral buys collateral from Uniswap V3
+     * @param collateralAddress The ERC20 address of the collateral
+     * @param collateralAmount The amount of collateral that we need to buy
+     * @param maxSupplyOut The amount of supply that we want to pay to get the collateral
+     * @param poolFee The uniswap pool fee: [10000, 3000, 500]
+     * @return supplyOut The amount of supply that transfered to uniswap
+     */
+    function buyCollateral(
+        address collateralAddress,
+        uint256 collateralAmount,
+        uint256 maxSupplyOut,
+        uint24 poolFee
+    ) internal returns (uint256 supplyOut) {
+        // Approve Uniswap V3 router to spend maximum amount of the supply
+        IERC20(supply).safeApprove(uniswapV3SwapRouter, maxSupplyOut);
+
+        // Set the params, we want to get exact amount of collateral with
+        // minimal supply out as possible
+        ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter
+            .ExactOutputSingleParams({
+                tokenIn: supply,
+                tokenOut: collateralAddress,
+                fee: poolFee,
+                recipient: address(this), // Set to this contract
+                deadline: block.timestamp,
+                amountOut: collateralAmount,
+                amountInMaximum: maxSupplyOut, // Max supply we want to pay
+                sqrtPriceLimitX96: 0
+            });
+
+        // Execute the swap
+        supplyOut = ISwapRouter(uniswapV3SwapRouter).exactOutputSingle(params);
     }
 
 }

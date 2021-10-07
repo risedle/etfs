@@ -13,7 +13,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDC_ADDRESS, CHAINLINK_USDC_USD} from "chain/Constants.sol";
+import {USDC_ADDRESS, CHAINLINK_USDC_USD, UNISWAPV3_SWAP_ROUTER} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
@@ -68,7 +68,8 @@ contract RisedleExternalTest is DSTest {
             "rvUSDC",
             USDC_ADDRESS,
             CHAINLINK_USDC_USD,
-            6
+            6,
+            UNISWAPV3_SWAP_ROUTER
         );
         return vault;
     }
