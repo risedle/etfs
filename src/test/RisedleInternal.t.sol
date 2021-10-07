@@ -21,6 +21,7 @@ import {USDT_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD} from "chain/Constan
 string constant vaultTokenName = "Risedle USDT Vault";
 string constant vaultTokenSymbol = "rvUSDT";
 address constant vaultUnderlying = USDT_ADDRESS;
+address constant vaultFeed = CHAINLINK_USDC_USD;
 uint8 constant vaultUnderlyingDecimals = 6;
 
 contract RisedleInternalTest is
@@ -29,6 +30,7 @@ contract RisedleInternalTest is
         vaultTokenName,
         vaultTokenSymbol,
         vaultUnderlying,
+        vaultFeed,
         vaultUnderlyingDecimals
     )
 {
@@ -41,8 +43,8 @@ contract RisedleInternalTest is
 
     /// @notice Make sure all important variables are correctly set after deployment
     function test_VaultProperties() public {
-        // Make sure underlying asset is correct
-        assertEq(underlying, vaultUnderlying);
+        // Make sure the vault's underlying asset is correct
+        assertEq(supply, vaultUnderlying);
 
         // Make sure total outstanding debt is zero
         assertEq(totalOutstandingDebt, 0);
@@ -51,7 +53,7 @@ contract RisedleInternalTest is
         assertEq(totalDebtProportion, 0);
 
         // Make sure total collected fees is zero
-        assertEq(totalPendingFees, 0);
+        assertEq(totalVaultPendingFees, 0);
 
         // Make sure the last timestamp accrued is initialized
         assertEq(lastTimestampInterestAccrued, block.timestamp);
@@ -92,22 +94,22 @@ contract RisedleInternalTest is
         assertEq(totalAvailable, amount);
 
         amount = 200 * 1e6; // 200 USDT
-        totalPendingFees = 100 * 1e6; // 100 USDT
+        totalVaultPendingFees = 100 * 1e6; // 100 USDT
         hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
-        assertEq(totalAvailable, amount - totalPendingFees);
+        assertEq(totalAvailable, amount - totalVaultPendingFees);
 
         // This most likely never happen; but we need to make sure to handle it
-        // totalPendingFees > Underlying balance
+        // totalVaultPendingFees > Underlying balance
         amount = 100 * 1e6; // 100 USDT
-        totalPendingFees = 105 * 1e6; // 105 USDT
+        totalVaultPendingFees = 105 * 1e6; // 105 USDT
         hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, 0);
 
         // Test with very high number
         amount = 100 * 1e12 * 1e6; // 100 trillion USDT
-        totalPendingFees = 90 * 1e12 * 1e6; // 90 trillion USDT
+        totalVaultPendingFees = 90 * 1e12 * 1e6; // 90 trillion USDT
         hevm.setUSDTBalance(address(this), amount);
         totalAvailable = getTotalAvailableCash();
         assertEq(totalAvailable, 10 * 1e12 * 1e6); // 10 trillion USDT
@@ -157,42 +159,42 @@ contract RisedleInternalTest is
 
         // Set all balance to zero
         totalOutstandingDebt = 0;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 0);
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Outstanding debt=0
         totalOutstandingDebt = 0;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 100 * 1e6);
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 0);
 
         // Available=100 USDT; Outstanding debt=50 USDT
         totalOutstandingDebt = 50 * 1e6;
-        totalPendingFees = 10 * 1e6;
+        totalVaultPendingFees = 10 * 1e6;
         hevm.setUSDTBalance(address(this), 110 * 1e6);
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 333333333333333333); // 0.33 Utilization rate
 
         // Available=50 USDT; Outstanding debt=100 USDT
         totalOutstandingDebt = 100 * 1e6;
-        totalPendingFees = 50 * 1e6;
+        totalVaultPendingFees = 50 * 1e6;
         hevm.setUSDTBalance(address(this), 100 * 1e6);
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 666666666666666666); // 0.66 Utilization rate
 
         // Available=0; Outstanding debt=100 USDT
         totalOutstandingDebt = 100 * 1e6;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 0);
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 1 ether); // 1.0 utilization rate
 
         // Test with very large number
         totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 100 * 1e12 * 1e6); // 100 trillion USDT
         utilizationRateInEther = getUtilizationRateInEther();
         assertEq(utilizationRateInEther, 0.5 ether); // 0.5 utilization rate
@@ -269,21 +271,21 @@ contract RisedleInternalTest is
 
         // Initial state: 0 utilization
         totalOutstandingDebt = 0;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 0);
         borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(borrowRatePerSecondInEther, 0);
 
         // 0.5 utilization rate (50%)
         totalOutstandingDebt = 100 * 1e6;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 100 * 1e6);
         borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(borrowRatePerSecondInEther, 3523310220); // approx 11.75% APY
 
         // 1.0 utilization rate (100%)
         totalOutstandingDebt = 100 * 1e6;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         hevm.setUSDTBalance(address(this), 0);
         borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(
@@ -296,7 +298,7 @@ contract RisedleInternalTest is
     function test_GetSupplyRatePerSecondInEther() public {
         // Test with 76% utilization rate
         totalOutstandingDebt = 100 * 1e6;
-        totalPendingFees = 20 * 1e6;
+        totalVaultPendingFees = 20 * 1e6;
         hevm.setUSDTBalance(address(this), 50 * 1e6);
         uint256 borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
         assertEq(borrowRatePerSecondInEther, 5420477262); // approx 18% APY
@@ -357,30 +359,30 @@ contract RisedleInternalTest is
     function test_setVaultStates() public {
         // interestAmount=0
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
-        totalPendingFees = 5 * 1e6; // 5 USDT
+        totalVaultPendingFees = 5 * 1e6; // 5 USDT
         lastTimestampInterestAccrued = 0;
         setVaultStates(0, 0);
         assertEq(totalOutstandingDebt, 100 * 1e6);
-        assertEq(totalPendingFees, 5 * 1e6);
+        assertEq(totalVaultPendingFees, 5 * 1e6);
         assertEq(lastTimestampInterestAccrued, 0);
 
         // interestAmount=10 USDT
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
-        totalPendingFees = 5 * 1e6; // 5 USDT
+        totalVaultPendingFees = 5 * 1e6; // 5 USDT
         lastTimestampInterestAccrued = 10;
         setVaultStates(10 * 1e6, 12); // 10 USDT
-        // The totalOutstandingDebt & totalPendingFees should be updated
+        // The totalOutstandingDebt & totalVaultPendingFees should be updated
         assertEq(totalOutstandingDebt, 110000000); // 110 USDT
-        assertEq(totalPendingFees, 6000000); // 6 USDT
+        assertEq(totalVaultPendingFees, 6000000); // 6 USDT
         assertEq(lastTimestampInterestAccrued, 12);
 
         // Test with very large numbers
         totalOutstandingDebt = 100 * 1e12 * 1e6; // 100 trillion USDT
-        totalPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT
+        totalVaultPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT
         lastTimestampInterestAccrued = 100;
         setVaultStates(10 * 1e12 * 1e6, 200); // 10 trillion USDT
         assertEq(totalOutstandingDebt, 110 * 1e12 * 1e6); // 110 trillion USDT
-        assertEq(totalPendingFees, 2 * 1e12 * 1e6); // 2 trillion USDT
+        assertEq(totalVaultPendingFees, 2 * 1e12 * 1e6); // 2 trillion USDT
         assertEq(lastTimestampInterestAccrued, 200);
     }
 
@@ -390,17 +392,17 @@ contract RisedleInternalTest is
 
         // Scenario 1: 0% utilization
         totalOutstandingDebt = 0;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
         uint256 contractBalance = 1000 * 1e6; // 1000 USDT
         hevm.setUSDTBalance(address(this), contractBalance); // Set the contract balance
         accrueInterest();
-        // Make sure it doesn't change the totalOutstandingDebt and totalPendingFees
+        // Make sure it doesn't change the totalOutstandingDebt and totalVaultPendingFees
         assertEq(totalOutstandingDebt, 0);
-        assertEq(totalPendingFees, 0);
+        assertEq(totalVaultPendingFees, 0);
 
         // Scenario 2: Below optimal utilization rate
         totalOutstandingDebt = 100 * 1e6; // 100 USDT
-        totalPendingFees = 20 * 1e6; // 20 USDT
+        totalVaultPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 24);
@@ -408,14 +410,14 @@ contract RisedleInternalTest is
         hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalOutstandingDebt and totalPendingFees are updated
+        // Make sure the totalOutstandingDebt and totalVaultPendingFees are updated
         assertEq(totalOutstandingDebt, 100046832); // 100 + (100% of interest amount)
-        assertEq(totalPendingFees, 20004683); // 20 + (10% of interest amount)
+        assertEq(totalVaultPendingFees, 20004683); // 20 + (10% of interest amount)
         assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
 
         // Scenario 3: Above optimzal utilization rate
         totalOutstandingDebt = 400 * 1e6; // 400 USDT
-        totalPendingFees = 20 * 1e6; // 20 USDT
+        totalVaultPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 3);
@@ -423,14 +425,14 @@ contract RisedleInternalTest is
         hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalOutstandingDebt and totalPendingFees are updated
+        // Make sure the totalOutstandingDebt and totalVaultPendingFees are updated
         assertEq(totalOutstandingDebt, 400063013); // 400 + (100% of interest amount)
-        assertEq(totalPendingFees, 20006301); // 20 + (10% of interest amount)
+        assertEq(totalVaultPendingFees, 20006301); // 20 + (10% of interest amount)
         assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
 
         // Scenario 4: Maximum utilization rate
         totalOutstandingDebt = 15000 * 1e6; // 15000 USDT
-        totalPendingFees = 20 * 1e6; // 20 USDT
+        totalVaultPendingFees = 20 * 1e6; // 20 USDT
         hevm.setUSDTBalance(address(this), 50 * 1e6); // Set contract balance
         lastTimestampInterestAccrued = block.timestamp; // Set accured interest to now
         nextTimestamp = lastTimestampInterestAccrued + (60 * 60 * 10);
@@ -438,9 +440,9 @@ contract RisedleInternalTest is
         hevm.warp(nextTimestamp);
         // Perform interest calculation
         accrueInterest();
-        // Make sure the totalOutstandingDebt and totalPendingFees are updated
+        // Make sure the totalOutstandingDebt and totalVaultPendingFees are updated
         assertEq(totalOutstandingDebt, 15027397260); // 400 + (100% of interest amount)
-        assertEq(totalPendingFees, 22739726); // 20 + (10% of interest amount)
+        assertEq(totalVaultPendingFees, 22739726); // 20 + (10% of interest amount)
         assertEq(lastTimestampInterestAccrued, nextTimestamp); // Make sure the last timestamp is updated
     }
 
@@ -460,7 +462,7 @@ contract RisedleInternalTest is
         hevm.setUSDTBalance(address(this), suppliedUSDT); // Set contract balance to 100USDT
 
         totalOutstandingDebt = 0;
-        totalPendingFees = 0;
+        totalVaultPendingFees = 0;
 
         // Mint to random address with 1:1 exchange rate
         address supplier = hevm.addr(1);
@@ -478,7 +480,7 @@ contract RisedleInternalTest is
 
         // 2. Interest accrued 10 USDT
         totalOutstandingDebt = totalOutstandingDebt + (9 * 1e6); // 9 USDT (90% of interest accrued)
-        totalPendingFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
+        totalVaultPendingFees = 1 * 1e6; // 1 USDT (10% of interest accrued)
 
         // 3. Exchange rate should ~1.08
         exchangeRateInETher = getExchangeRateInEther();
@@ -491,7 +493,7 @@ contract RisedleInternalTest is
         hevm.setUSDTBalance(address(this), (50 * 1e12 * 1e6)); // Set contract balance to 50 trillion USDT
         totalOutstandingDebt = (50 * 1e12 * 1e6); // 50 trillion USDT
         totalOutstandingDebt = totalOutstandingDebt + (9 * 1e12 * 1e6); // 9 trillion USDT (90% of interest accrued)
-        totalPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)
+        totalVaultPendingFees = 1 * 1e12 * 1e6; // 1 trillion USDT (10% of interest accrued)
         exchangeRateInETher = getExchangeRateInEther();
         assertEq(exchangeRateInETher, 1.08 ether); // 1.08
     }
@@ -570,5 +572,16 @@ contract RisedleInternalTest is
         priceInGwei = getChainlinkPriceInGwei(CHAINLINK_USDC_USD);
         assertGt(priceInGwei, 0.9 gwei);
         assertLt(priceInGwei, 1.1 gwei);
+    }
+
+    /// @notice Make sure that we can get the collateral price
+    function test_GetCollateralPrice() public {
+        // Supply is set to USDC, see on the on this contract constructor
+        uint256 wethUSDC = getCollateralPrice(CHAINLINK_ETH_USD);
+
+        // Currently ETH is trading on range 2500USDC - 5000USDC
+        // (Oct 2021) I Hope this test is failed
+        assertGt(wethUSDC, 2500 * 1e6);
+        assertLt(wethUSDC, 5000 * 1e6);
     }
 }

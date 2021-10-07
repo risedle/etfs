@@ -13,7 +13,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDT_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD} from "chain/Constants.sol";
+import {USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
@@ -33,7 +33,7 @@ contract FeeCollector {
 
 contract RisedleAccessControlTest is DSTest {
     // Test utils
-    IERC20 constant USDT = IERC20(USDT_ADDRESS);
+    IERC20 constant USDC = IERC20(USDC_ADDRESS);
     Hevm hevm;
 
     /// @notice Run the test setup
@@ -45,9 +45,10 @@ contract RisedleAccessControlTest is DSTest {
     function createNewVault() internal returns (Risedle) {
         // Create new vault
         Risedle vault = new Risedle(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            USDT_ADDRESS,
+            "Risedle USDC Vault",
+            "rvUSDC",
+            USDC_ADDRESS,
+            CHAINLINK_USDC_USD,
             6
         );
         return vault;
@@ -176,7 +177,7 @@ contract RisedleAccessControlTest is DSTest {
         Risedle vault = createNewVault();
 
         // Create new ETF as governance
-        uint256 initialPrice = 100 * 1e6; // 100 USDT
+        uint256 initialPrice = 100 * 1e6; // 100 USDC
         address etfToken = hevm.addr(1); // Set random address
         uint256 feeInEther = 0.001 ether; // 0.1% creation and redemption fee
         vault.createNewETF(

@@ -13,7 +13,7 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
 // See .dapprc
-import {USDT_ADDRESS} from "chain/Constants.sol";
+import {USDC_ADDRESS, CHAINLINK_USDC_USD} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
@@ -28,7 +28,7 @@ contract Lender {
 
     constructor(Risedle vault) {
         _vault = vault;
-        underlying = IERC20(vault.underlying());
+        underlying = IERC20(vault.supply());
     }
 
     /// @notice lender supply asset
@@ -52,7 +52,7 @@ contract Lender {
 
 contract RisedleExternalTest is DSTest {
     // Test utils
-    IERC20 constant USDT = IERC20(USDT_ADDRESS);
+    IERC20 constant USDC = IERC20(USDC_ADDRESS);
     Hevm hevm;
 
     /// @notice Run the test setup
@@ -64,9 +64,10 @@ contract RisedleExternalTest is DSTest {
     function createNewVault() internal returns (Risedle) {
         // Create new vault
         Risedle vault = new Risedle(
-            "Risedle USDT Vault",
-            "rvUSDT",
-            USDT_ADDRESS,
+            "Risedle USDC Vault",
+            "rvUSDC",
+            USDC_ADDRESS,
+            CHAINLINK_USDC_USD,
             6
         );
         return vault;
@@ -80,9 +81,9 @@ contract RisedleExternalTest is DSTest {
         // Create new lender
         Lender lender = new Lender(vault);
 
-        // Set the lender USDT balance
-        uint256 amount = 1000 * 1e6; // 1000 USDT
-        hevm.setUSDTBalance(address(lender), amount);
+        // Set the lender USDC balance
+        uint256 amount = 1000 * 1e6; // 1000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
 
         // Lender add supply to the vault
         lender.lend(amount);
@@ -91,8 +92,8 @@ contract RisedleExternalTest is DSTest {
         uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
         assertEq(lenderVaultTokenBalance, amount);
 
-        // The vault should receive the USDT
-        assertEq(USDT.balanceOf(address(vault)), amount);
+        // The vault should receive the USDC
+        assertEq(USDC.balanceOf(address(vault)), amount);
     }
 
     /// @notice Make sure the lender can remove asset from the vault
@@ -103,15 +104,15 @@ contract RisedleExternalTest is DSTest {
         // Create new lender
         Lender lender = new Lender(vault);
 
-        // Set the lender USDT balance
-        uint256 amount = 1000 * 1e6; // 1000 USDT
-        hevm.setUSDTBalance(address(lender), amount);
+        // Set the lender USDC balance
+        uint256 amount = 1000 * 1e6; // 1000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
 
         // Lender add supply to the vault
         lender.lend(amount);
 
         // Make sure the vault receive the asset
-        assertEq(USDT.balanceOf(address(vault)), amount);
+        assertEq(USDC.balanceOf(address(vault)), amount);
 
         // Lender remove supply from the vault
         lender.withdraw(amount);
@@ -120,10 +121,10 @@ contract RisedleExternalTest is DSTest {
         uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
         assertEq(lenderVaultTokenBalance, 0);
 
-        // The lender should receive the USDT back
-        assertEq(USDT.balanceOf(address(lender)), amount);
+        // The lender should receive the USDC back
+        assertEq(USDC.balanceOf(address(lender)), amount);
 
-        // Not the vault should have zero USDT
-        assertEq(USDT.balanceOf(address(vault)), 0);
+        // Not the vault should have zero USDC
+        assertEq(USDC.balanceOf(address(vault)), 0);
     }
 }
