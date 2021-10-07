@@ -584,4 +584,23 @@ contract RisedleInternalTest is
         assertGt(wethUSDC, 2500 * 1e6);
         assertLt(wethUSDC, 5000 * 1e6);
     }
+
+    /// @notice Make sure that the price threshold calculation is correct
+    function test_GetPriceThreshold() public {
+        uint256 amount;
+        uint256 outputThreshold;
+        uint256 expectedThreshold;
+
+        // Test with smol number
+        amount = 50 ether;
+        expectedThreshold = 0.045 ether;
+        outputThreshold = getPriceThreshold(amount);
+        assertEq(outputThreshold, expectedThreshold);
+
+        // Test with very large number
+        amount = (120 * 1e12) * 1 ether; // 120 trillion ether
+        expectedThreshold = (108 * 1e9) * 1 ether;
+        outputThreshold = getPriceThreshold(amount);
+        assertEq(outputThreshold, expectedThreshold);
+    }
 }

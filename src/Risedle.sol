@@ -661,7 +661,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      */
     function getCollateralAndFeeAmount(uint256 amount, uint256 feeInEther)
         internal
-        view
+        pure
         returns (uint256 collateralAmount, uint256 feeAmount)
     {
         feeAmount = (amount * feeInEther) / 1 ether;
@@ -709,6 +709,16 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Convert gwei to supply decimals
         collateralPrice = (priceInGwei * (10**_decimals)) / 1 gwei;
+    }
+
+    /**
+     * @notice getPriceThreshold returns 0.9% of amount
+     * @dev We use the this to prevent swap transaction failed when there is slight price movement
+     * @param amount The amount
+     * @return The price threshold
+     */
+    function getPriceThreshold(uint256 amount) internal pure returns (uint256) {
+        return (0.0009 ether * amount) / 1 ether;
     }
 
 }
