@@ -736,16 +736,6 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getPriceThreshold returns 0.9% of amount
-     * @dev We use the this to prevent swap transaction failed when there is slight price movement
-     * @param amount The amount
-     * @return The price threshold
-     */
-    function getPriceThreshold(uint256 amount) internal pure returns (uint256) {
-        return (0.0009 ether * amount) / 1 ether;
-    }
-
-    /**
      * @notice swapExactOutputSingle swaps assets via Uniswap V3
      * @param tokenIn The token that we need to transfer to Uniswap V3
      * @param tokenOut The token that we want to get from the Uniswap V3
@@ -762,7 +752,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint24 poolFee
     ) internal returns (uint256 amountIn) {
         // Approve Uniswap V3 router to spend maximum amount of the supply
-        IERC20(supply).safeApprove(uniswapV3SwapRouter, amountInMaximum);
+        IERC20(tokenIn).safeApprove(uniswapV3SwapRouter, amountInMaximum);
 
         // Set the params, we want to get exact amount of collateral with
         // minimal supply out as possible
@@ -774,7 +764,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
                 recipient: address(this), // Set to this contract
                 deadline: block.timestamp,
                 amountOut: amountOut,
-                amountInMaximum: amountInMaximum, // Max supply we want to pay
+                amountInMaximum: amountInMaximum, // Max supply we want to pay or max collateral we want to sold
                 sqrtPriceLimitX96: 0
             });
 
@@ -854,11 +844,11 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice setETFDebtStates sets the debt of the ETF token
+     * @notice setETFBorrowStates sets the debt of the ETF token
      * @param etf The address of the ETF token
      * @param borrowAmount The amount that borrowed by the ETF
      */
-    function setETFDebtStates(address etf, uint256 borrowAmount) internal {
+    function setETFBorrowStates(address etf, uint256 borrowAmount) internal {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
         totalOutstandingDebt += borrowAmount;
         uint256 borrowProportion = (borrowAmount * 1 ether) /
@@ -927,13 +917,13 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 collateralAmount,
         uint256 collateralPrice
     ) internal returns (uint256 borrowAmount) {
-        // Get the collateral value
-        uint256 collateralValue = (collateralAmount * collateralPrice) /
-            (10**etfInfo.collateralDecimals);
+        // Maximum plus +1% from the chainlink oracle
+        uint256 maximumCollateralPrice = collateralPrice +
+            ((0.01 ether * collateralPrice) / 1 ether);
 
-        // Get the price threshold
-        uint256 threshold = getPriceThreshold(collateralValue);
-        uint256 maxSupplyOut = collateralValue + threshold;
+        // Get the collateral value
+        uint256 maxSupplyOut = (collateralAmount * maximumCollateralPrice) /
+            (10**etfInfo.collateralDecimals);
 
         // Make sure we do have enough supply available
         require(getTotalAvailableCash() > maxSupplyOut, "!NotEnoughSupply");
@@ -990,7 +980,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         );
 
         // Set ETF debt states
-        setETFDebtStates(etfInfo.token, borrowAmount);
+        setETFBorrowStates(etfInfo.token, borrowAmount);
 
         uint256 mintedAmount = getETFMintAmount(
             etfInfo,
@@ -1001,5 +991,94 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Transfer ETF token to the caller
         IRisedleETFToken(etf).mint(msg.sender, mintedAmount);
+    }
+
+    /**
+     * @notice setETFRepayStates repay the debt of the ETF
+     * @param etf The address of the ETF token
+     * @param repayAmount The amount that borrowed by the ETF
+     */
+    function setETFRepayStates(address etf, uint256 repayAmount) internal {
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt -= repayAmount;
+        uint256 repayProportion = (repayAmount * 1 ether) /
+            debtProportionRateInEther;
+        totalDebtProportion -= repayProportion;
+        debtProportion[etf] -= repayProportion;
+    }
+
+    /**
+     * @notice Redeem ETF token to get the collateral back
+     * @param etf The address of the ETF token
+     * @param amount The mount of ETF token need to be burned
+     */
+    function burn(address etf, uint256 amount) external nonReentrant {
+        // Accrue interest
+        accrueInterest();
+        // Get the ETF info
+        ETFInfo memory etfInfo = etfs[etf];
+        require(etfInfo.feeInEther > 0, "!ETF"); // Make sure the ETF is exists
+
+        // Get collateral per ETF and debt per ETF
+        uint256 etfTotalSupply = IERC20(etfInfo.token).totalSupply();
+        uint256 collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfInfo.totalCollateral,
+            etfInfo.totalPendingFees,
+            etfInfo.collateralDecimals
+        );
+        uint256 debtPerETF = getDebtPerETF(
+            etfInfo.token,
+            etfTotalSupply,
+            etfInfo.collateralDecimals
+        );
+
+        // Burn the ETF token
+        IRisedleETFToken(etf).burn(msg.sender, amount);
+
+        // The amount we need to repay (e.g. 100 USDC)
+        uint256 repayAmount = (debtPerETF * amount) /
+            (10**etfInfo.collateralDecimals);
+
+        // Set the repay states
+        setETFRepayStates(etf, repayAmount);
+
+        // Get the collateral price
+        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+        // Maximum minus -1% from the chainlink oracle
+        uint256 minimumCollateralPrice = collateralPrice -
+            ((0.01 ether * collateralPrice) / 1 ether);
+
+        // Get the collateral value
+        uint256 collateralAmount = (amount * collateralPerETF) /
+            (10**etfInfo.collateralDecimals);
+        uint256 collateralValue = (collateralAmount * minimumCollateralPrice) /
+            (10**etfInfo.collateralDecimals);
+
+        // Get the amount of collateral that we need to sell in order to repay
+        // the debt
+        // collateral need to sold = (repayAmount / colalteralValue) * collateralAmount
+        uint256 collateralRepay = (((repayAmount * (1 ether)) /
+            collateralValue) * collateralAmount) / 1 ether;
+
+        // Sell the collateral to repay the asset
+        uint256 collateralSold = swapExactOutputSingle(
+            etfInfo.collateral,
+            supply,
+            repayAmount,
+            collateralRepay,
+            etfInfo.uniswapV3PoolFee
+        );
+
+        // Deduct fee and send collateral to the user
+        (uint256 redeemAmount, uint256 feeAmount) = getCollateralAndFeeAmount(
+            collateralAmount - collateralSold,
+            etfInfo.feeInEther
+        );
+        etfs[etfInfo.token].totalCollateral -= (collateralAmount - feeAmount);
+        etfs[etfInfo.token].totalPendingFees += feeAmount;
+
+        // Send the remaining collateral to the investor minus the fee
+        IERC20(etfInfo.collateral).safeTransfer(msg.sender, redeemAmount);
     }
 }

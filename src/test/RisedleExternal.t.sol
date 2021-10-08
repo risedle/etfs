@@ -65,10 +65,18 @@ contract Investor {
         uint256 amount
     ) public {
         // approve vault to spend the collateral token
-        IERC20(WETH_ADDRESS).approve(address(_vault), type(uint256).max);
+        IERC20(collateral).approve(address(_vault), type(uint256).max);
 
         // Mint new ETF token
         _vault.mint(etf, amount);
+    }
+
+    function redeem(address etf, uint256 amount) public {
+        // approve vault to spend the etf token
+        IERC20(etf).approve(address(_vault), type(uint256).max);
+
+        // Mint new ETF token
+        _vault.burn(etf, amount);
     }
 }
 
@@ -260,5 +268,73 @@ contract RisedleExternalTest is DSTest {
 
         // Invest to te ETF
         investor.invest(address(token), WETH_ADDRESS, investAmount); // This should be failed
+    }
+
+    /// @notice Make sure the investor can redeem the ETF token
+    function test_InvestorCanRedeemETFToken() public {
+        // Create new vault
+        Risedle vault = createNewVault();
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDC balance
+        uint256 amount = 10000 * 1e6; // 1000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
+
+        // Lender add supply to the vault
+        lender.lend(amount);
+
+        // Create new ETF token
+        RisedleETFToken token = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            address(vault), // set the vault as the owner
+            18
+        );
+
+        // Create new ETF
+        vault.createNewETF(
+            address(token),
+            WETH_ADDRESS,
+            CHAINLINK_ETH_USD,
+            100 * 1e6, // ETF initial price
+            0.001 ether, // ETF creation and redemption fee 0.1%
+            500 // Uniswap V3 Pool fee
+        );
+
+        // Create new investor
+        Investor investor = new Investor(vault);
+
+        // Set the investor WETH balance and invest it to the protocol
+        uint256 investAmount = 1.5 ether;
+        hevm.setWETHBalance(address(investor), investAmount);
+        investor.invest(address(token), WETH_ADDRESS, investAmount);
+
+        // Get the etf token balance of the investor
+        uint256 etfTokenBalance = token.balanceOf(address(investor));
+
+        // Redeem the etf token
+        investor.redeem(address(token), etfTokenBalance);
+
+        // Make sure the investor receive the collateral back
+        uint256 investorWETHBalance = IERC20(WETH_ADDRESS).balanceOf(
+            address(investor)
+        );
+        assertGt(investorWETHBalance, 1.4 ether); // Should greater than 1.4 WETH
+
+        // Make sure there is fee left to the vault
+        uint256 vaultWETHBalance = IERC20(WETH_ADDRESS).balanceOf(
+            address(vault)
+        );
+        assertGt(vaultWETHBalance, 0.0015 ether); // Greater than creation fee
+
+        // Validate the ETF states
+        Risedle.ETFInfo memory etfInfo = vault.getETFInfo(address(token));
+        assertGt(etfInfo.totalCollateral, 0.0015 ether); // Greater than creation fee
+        assertGt(etfInfo.totalPendingFees, 0.0015 ether); // Greater than creation fee
+
+        // Validate the borrow state
+        assertGt(vault.getOutstandingDebt(address(token)), 0); // It should be all repaid
     }
 }

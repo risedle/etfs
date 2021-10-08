@@ -594,30 +594,11 @@ contract RisedleInternalTest is
         assertLt(wethUSDC, 5000 * 1e6);
     }
 
-    /// @notice Make sure that the price threshold calculation is correct
-    function test_GetPriceThreshold() public {
-        uint256 amount;
-        uint256 outputThreshold;
-        uint256 expectedThreshold;
-
-        // Test with smol number
-        amount = 50 ether;
-        expectedThreshold = 0.045 ether;
-        outputThreshold = getPriceThreshold(amount);
-        assertEq(outputThreshold, expectedThreshold);
-
-        // Test with very large number
-        amount = (120 * 1e12) * 1 ether; // 120 trillion ether
-        expectedThreshold = (108 * 1e9) * 1 ether;
-        outputThreshold = getPriceThreshold(amount);
-        assertEq(outputThreshold, expectedThreshold);
-    }
-
     /// @notice Make sure buy collateral is working
     function test_SwapExactOutputSingle() public {
         uint256 wethUSDC = getCollateralPrice(CHAINLINK_ETH_USD);
         uint256 collateralAmount = 1 ether;
-        uint256 maxSupplyOut = wethUSDC + getPriceThreshold(wethUSDC);
+        uint256 maxSupplyOut = wethUSDC + ((0.01 ether * wethUSDC) / 1 ether); // +1% to prevent tx fails when there is high volatility
         uint24 poolFee = 500;
 
         // Set the balance of the vault first
