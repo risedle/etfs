@@ -6,7 +6,7 @@ This repository contains smart contract for decentralized leveraged ETFs.
 
 The frontend is available [here](https://github.com/risedle/frontend).
 
-- Website: [risedle.com](https://risedle.com)
+- Website: [demo.risedle.com](https://demo.risedle.com)
 - Docs: [docs.risedle.com](https://docs.risedle.com)
 - Twitter: [@risedle](https://twitter.com/risedle)
 - Whitepaper: [ETHRISE Whitepaper](https://observablehq.com/@pyk/ethrise)
@@ -111,18 +111,15 @@ Run the following command to get deployment gas report:
 
 Here is the example output:
 
-      ./scripts/risedle-vault-gas-with-build-optimization.sh
-      Risedle Vault with DAPP_BUILD_OPTIMIZE=1
-      Deployment gas usage: 2513337
-      ./scripts/risedle-vault-gas-without-build-optimization.sh
-      Risedle Vault with DAPP_BUILD_OPTIMIZE=0
-      Deployment gas usage: 3644718
-      ./scripts/risedle-etf-gas-with-build-optimization.sh
-      Risedle ETF with DAPP_BUILD_OPTIMIZE=1
-      Deployment gas usage: 1137986
-      ./scripts/risedle-etf-gas-without-build-optimization.sh
-      Risedle ETF with DAPP_BUILD_OPTIMIZE=0
-      Deployment gas usage: 1761578
+      ./scripts/empty-gas-with-build-optimization.sh
+      Empty contract with DAPP_BUILD_OPTIMIZE=1
+      Deployment gas usage: 67066
+      ./scripts/risedle-gas-with-build-optimization.sh
+      Risedle with DAPP_BUILD_OPTIMIZE=1
+      Deployment gas usage: 3617147
+      ./scripts/risedle-gas-without-build-optimization.sh
+      Risedle with DAPP_BUILD_OPTIMIZE=0
+      Deployment gas usage: 5138125
 
 ### VSCode
 
