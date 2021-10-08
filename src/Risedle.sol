@@ -570,7 +570,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice setVaultParameters updates the vault parameters.
-     * @dev Only governor can call this function
+     * @dev Only governance can call this function
      * @param u The optimal utilization rate in ether units
      * @param s1 The interest slope 1 in ether units
      * @param s2 The interest slope 2 in ether units
@@ -616,7 +616,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice setFeeRecipient sets the fee recipient address.
-     * @dev Only governor can call this function
+     * @dev Only governance can call this function
      */
     function setFeeRecipient(address account) external onlyOwner {
         feeRecipient = account;

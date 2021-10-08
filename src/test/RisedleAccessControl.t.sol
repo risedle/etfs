@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Risedle's Vault Access Control Test
-// Make sure the Governor ownership is working as expected
+// Make sure the Governance ownership is working as expected
 
 pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
@@ -55,20 +55,20 @@ contract RisedleAccessControlTest is DSTest {
         return vault;
     }
 
-    /// @notice Make sure the governor is properly set
-    function test_GovernorIsProperlySet() public {
+    /// @notice Make sure the governance is properly set
+    function test_GovernanceIsProperlySet() public {
         // Create new vault
         Risedle vault = createNewVault();
 
-        // The governor is the one who create/deploy the vault
+        // The governance is the one who create/deploy the vault
         assertEq(vault.owner(), address(this));
     }
 
-    /// @notice Make sure non-governor account cannot set vault parameters
-    function testFail_NonGovernorCannotSetVaultParameters() public {
-        address governor = hevm.addr(2); // Use random address as governor
+    /// @notice Make sure non-governance account cannot set vault parameters
+    function testFail_NonGovernanceCannotSetVaultParameters() public {
+        address governance = hevm.addr(2); // Use random address as governance
         Risedle vault = createNewVault();
-        vault.transferOwnership(governor);
+        vault.transferOwnership(governance);
 
         // Make sure this is fail
         vault.setVaultParameters(
@@ -80,9 +80,9 @@ contract RisedleAccessControlTest is DSTest {
         );
     }
 
-    /// @notice Make sure governor can update the vault parameters
-    function test_GovernorCanSetVaultParameters() public {
-        // This contract is the governor by default
+    /// @notice Make sure governance can update the vault parameters
+    function test_GovernanceCanSetVaultParameters() public {
+        // This contract is the governance by default
         Risedle vault = createNewVault();
 
         // Update vault's parameters
@@ -110,19 +110,19 @@ contract RisedleAccessControlTest is DSTest {
         assertEq(f, fee);
     }
 
-    /// @notice Make sure non-governor account cannot change the fee recipient
-    function testFail_NonGovernorCannotSetFeeRecipientAddress() public {
-        // Set governor
-        address governor = hevm.addr(2);
+    /// @notice Make sure non-governance account cannot change the fee recipient
+    function testFail_NonGovernanceCannotSetFeeRecipientAddress() public {
+        // Set governance
+        address governance = hevm.addr(2);
         Risedle vault = createNewVault();
-        vault.transferOwnership(governor);
+        vault.transferOwnership(governance);
 
         // Make sure it fails
         vault.setFeeRecipient(hevm.addr(3));
     }
 
-    /// @notice Make sure governor can update the fee recipient
-    function test_GovernorCanSetFeeRecipientAddress() public {
+    /// @notice Make sure governance can update the fee recipient
+    function test_GovernanceCanSetFeeRecipientAddress() public {
         // Set the new fee recipient
         address newReceiver = hevm.addr(2);
 
@@ -140,9 +140,9 @@ contract RisedleAccessControlTest is DSTest {
     /// @notice Test accrue interest as public
     function test_AnyoneCanAccrueInterest() public {
         // Create new vault
-        address governor = hevm.addr(2);
+        address governance = hevm.addr(2);
         Risedle vault = createNewVault();
-        vault.transferOwnership(governor);
+        vault.transferOwnership(governance);
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;
