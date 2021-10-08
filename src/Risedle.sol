@@ -126,20 +126,6 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 redeemedAmount
     );
 
-    /// @notice Event emitted when ETF borrow from the vault
-    event Borrowed(
-        address indexed account,
-        uint256 amount,
-        uint256 debtProportionRateInEther
-    );
-
-    /// @notice Event emitted when ETF repay to the vault
-    event Repaid(
-        address indexed account,
-        uint256 amount,
-        uint256 debtProportionRateInEther
-    );
-
     /// @notice Event emitted when vault parameters are updated
     event VaultParametersUpdated(
         address indexed updater,
@@ -155,6 +141,20 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newFeeRecipient);
+
+    /// @notice Event emitted when new ETF token minted
+    event ETFMinted(
+        address indexed investor,
+        address indexed etf,
+        uint256 amount
+    );
+
+    /// @notice Event emitted when new ETF token burned
+    event ETFBurned(
+        address indexed investor,
+        address indexed etf,
+        uint256 amount
+    );
 
     /**
      * @notice Contruct new vault
@@ -991,6 +991,8 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Transfer ETF token to the caller
         IRisedleETFToken(etf).mint(msg.sender, mintedAmount);
+
+        emit ETFMinted(msg.sender, etf, mintedAmount);
     }
 
     /**
@@ -1005,6 +1007,23 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             debtProportionRateInEther;
         totalDebtProportion -= repayProportion;
         debtProportion[etf] -= repayProportion;
+    }
+
+    /**
+     * @notice getRepay amount
+     */
+    function getRepayAmount(
+        ETFInfo memory etfInfo,
+        uint256 totalSupply,
+        uint256 amount
+    ) internal view returns (uint256 repayAmount) {
+        uint256 debtPerETF = getDebtPerETF(
+            etfInfo.token,
+            totalSupply,
+            etfInfo.collateralDecimals
+        );
+
+        repayAmount = (debtPerETF * amount) / (10**etfInfo.collateralDecimals);
     }
 
     /**
@@ -1027,18 +1046,12 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             etfInfo.totalPendingFees,
             etfInfo.collateralDecimals
         );
-        uint256 debtPerETF = getDebtPerETF(
-            etfInfo.token,
-            etfTotalSupply,
-            etfInfo.collateralDecimals
-        );
 
         // Burn the ETF token
         IRisedleETFToken(etf).burn(msg.sender, amount);
 
         // The amount we need to repay (e.g. 100 USDC)
-        uint256 repayAmount = (debtPerETF * amount) /
-            (10**etfInfo.collateralDecimals);
+        uint256 repayAmount = getRepayAmount(etfInfo, etfTotalSupply, amount);
 
         // Set the repay states
         setETFRepayStates(etf, repayAmount);
@@ -1080,5 +1093,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Send the remaining collateral to the investor minus the fee
         IERC20(etfInfo.collateral).safeTransfer(msg.sender, redeemAmount);
+
+        emit ETFBurned(msg.sender, etf, amount);
     }
 }
