@@ -192,13 +192,17 @@ contract RisedleAccessControlTest is DSTest {
         );
 
         // Get the ETF info
-        Risedle.ETFInfo memory info = vault.getETFInfo(etfToken);
+        Risedle.ETFInfo memory etfInfo = vault.getETFInfo(etfToken);
 
-        // Make sure the info is correct
-        assertEq(info.underlying, WETH_ADDRESS);
-        assertEq(info.feed, CHAINLINK_ETH_USD);
-        assertEq(info.initialPrice, initialPrice);
-        assertEq(info.token, etfToken);
-        assertEq(info.feeInEther, feeInEther);
+        // Make sure the etfInfo is correct
+        assertEq(etfInfo.token, etfToken);
+        assertEq(etfInfo.collateral, WETH_ADDRESS);
+        assertEq(etfInfo.collateralDecimals, 18);
+        assertEq(etfInfo.feed, CHAINLINK_ETH_USD);
+        assertEq(etfInfo.initialPrice, initialPrice);
+        assertEq(etfInfo.feeInEther, feeInEther);
+        assertEq(etfInfo.totalCollateral, 0);
+        assertEq(etfInfo.totalPendingFees, 0);
+        assertEq(etfInfo.uniswapV3PoolFee, 500);
     }
 }

@@ -81,10 +81,13 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     /// @notice ETFInfo contains information of the ETF
     struct ETFInfo {
         address token; // Address of ETF token ERC20, make sure this vault can mint & burn this token
-        address underlying; // ETF underlying asset (e.g. WETH address)
+        address collateral; // ETF underlying asset (e.g. WETH address)
+        uint8 collateralDecimals;
         address feed; // Chainlink feed (e.g. ETH/USD)
         uint256 initialPrice; // In term of vault's underlying asset (e.g. 100 USDC -> 100 * 1e6, coz is 6 decimals for USDC)
-        uint256 feeInEther; // Creation and redemption fee in ether units
+        uint256 feeInEther; // Creation and redemption fee in ether units (e.g. 0.1% is 0.001 ether)
+        uint256 totalCollateral; // Total amount of underlying managed by this ETF
+        uint256 totalPendingFees; // Total amount of creation and redemption pending fees in ETF underlying
         uint24 uniswapV3PoolFee; // Uniswap V3 Pool fee https://docs.uniswap.org/sdk/reference/enums/FeeAmount
     }
 
@@ -524,11 +527,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @notice getOutstandingDebt returns the debt owed by the borrower
      * @param account The borrower address
      */
-    function getOutstandingDebt(address account)
-        external
-        view
-        returns (uint256)
-    {
+    function getOutstandingDebt(address account) public view returns (uint256) {
         // If there is no debt, return 0
         if (totalOutstandingDebt == 0) {
             return 0;
@@ -628,26 +627,32 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @notice createNewETF creates new ETF
      * @dev Only governance can create new ETF
      * @param token The ETF token, this contract should have access to mint & burn
-     * @param underlying_ The underlying token of ETF (e.g. WETH)
+     * @param collateral The underlying token of ETF (e.g. WETH)
      * @param chainlinkFeed Chainlink feed (e.g. ETH/USD)
      * @param initialPrice Initial price of the ETF based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
      * @param feeInEther Creation and redemption fee in ether units
      */
     function createNewETF(
         address token,
-        address underlying_,
+        address collateral,
         address chainlinkFeed,
         uint256 initialPrice,
         uint256 feeInEther,
         uint24 uniswapV3PoolFee
     ) external onlyOwner {
+        // Get collateral decimals
+        uint8 collateralDecimals = IERC20Metadata(collateral).decimals();
+
         // Create new ETF info
         ETFInfo memory info = ETFInfo(
             token,
-            underlying_,
+            collateral,
+            collateralDecimals,
             chainlinkFeed,
             initialPrice,
             feeInEther,
+            0,
+            0,
             uniswapV3PoolFee
         );
 
@@ -768,4 +773,24 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         supplyOut = ISwapRouter(uniswapV3SwapRouter).exactOutputSingle(params);
     }
 
+    /**
+     * @notice getCollateralPerETF returns the collateral shares per ETF
+     * @param etf The ETF information
+     * @return collateralPerETF The amount of collateral per ETF (e.g. 0.5 ETH is 0.5*1e18)
+     */
+    function getCollateralPerETF(ETFInfo memory etf)
+        internal
+        view
+        returns (uint256 collateralPerETF)
+    {
+        // Get the current total supply of the ETF token
+        uint256 totalSupply = IERC20(etf.token).totalSupply();
+        if (totalSupply == 0) return 0;
+
+        // Get collateral per etf
+        collateralPerETF =
+            ((etf.totalCollateral - etf.totalPendingFees) *
+                (10**etf.collateralDecimals)) /
+            totalSupply;
+    }
 }

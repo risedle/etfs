@@ -12,6 +12,7 @@ import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/e
 
 import {Hevm} from "./Hevm.sol";
 import {Risedle} from "../Risedle.sol";
+import {RisedleETFToken} from "../RisedleETFToken.sol";
 
 // chain/* is replaced by DAPP_REMAPPINGS at compile time,
 // this allow us to use custom address on specific chain
@@ -638,5 +639,120 @@ contract RisedleInternalTest is
 
         // Make sure supply out is not larger than the max supply out
         assertLt(supplyOut, maxSupplyOut);
+    }
+
+    /// @notice Make sure the collateral per ETF is working as expected
+    function test_GetCollateralPerETF() public {
+        // Set this contract as governance
+        address governance = address(this);
+        uint8 decimals = 18; // Similar to WETH
+        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
+
+        uint256 collateralPerETF;
+        uint256 totalSupply;
+        uint256 totalCollateral;
+        uint256 totalPendingFees;
+        ETFInfo memory etfInfo;
+
+        // Create new Risedle ETF token
+        RisedleETFToken token = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            governance,
+            decimals
+        );
+
+        /// Create new Risedle ETF
+        // totalCollateral managed by ETF = 0
+        // totalPendingFees in ETF = 0
+        // totalSupply of etf token = 0
+        // Expected collateralPerETF is zero
+        etfInfo = ETFInfo(
+            address(token),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            0,
+            0,
+            500
+        );
+        collateralPerETF = getCollateralPerETF(etfInfo);
+        assertEq(collateralPerETF, 0);
+
+        // Set the states
+        totalCollateral = 9 ether;
+        totalPendingFees = 1 ether;
+        totalSupply = 10 ether;
+        etfInfo = ETFInfo(
+            address(token),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            totalCollateral,
+            totalPendingFees,
+            500
+        );
+        token.mint(recipient, totalSupply); // Inflate the supply
+        collateralPerETF = getCollateralPerETF(etfInfo);
+        assertEq(collateralPerETF, 0.8 ether);
+        token.burn(recipient, totalSupply); // Restore the total supply
+
+        // User very large number
+        totalCollateral = (9 * 1e12) * 1 ether; // 9 trillion ether
+        totalPendingFees = (1 * 1e12) * 1 ether; // 1 trillion ether
+        totalSupply = (10 * 1e12) * 1 ether; // 10 trillion ether
+        etfInfo = ETFInfo(
+            address(token),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            totalCollateral,
+            totalPendingFees,
+            500
+        );
+        token.mint(recipient, totalSupply); // Inflate the supply
+        collateralPerETF = getCollateralPerETF(etfInfo);
+        assertEq(collateralPerETF, 0.8 ether);
+        token.burn(recipient, totalSupply); // Restore the total supply
+    }
+
+    /// @notice Make sure it fails when totalPendingFees > totalCollateral
+    function testFail_GetCollateralPerETFFeeTooLarge() public {
+        // Set this contract as governance
+        address governance = address(this);
+        uint8 decimals = 18; // Similar to WETH
+        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
+
+        // Create new Risedle ETF token
+        RisedleETFToken token = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            governance,
+            decimals
+        );
+
+        /// Create new Risedle ETF
+        uint256 totalCollateral = 1 ether;
+        uint256 totalPendingFees = 9 ether;
+        uint256 totalSupply = 10 ether;
+        ETFInfo memory etfInfo = ETFInfo(
+            address(token),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            totalCollateral,
+            totalPendingFees,
+            500
+        );
+        token.mint(recipient, totalSupply); // Inflate the supply
+        getCollateralPerETF(etfInfo); // should be failed
     }
 }
