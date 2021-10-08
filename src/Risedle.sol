@@ -17,11 +17,14 @@ pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {IChainlinkAggregatorV3} from "./interfaces/Chainlink.sol";
 import {ISwapRouter} from "./interfaces/UniswapV3.sol";
+
+import {IRisedleETFToken} from "./RisedleETFToken.sol";
 
 /// @title Risedle
 contract Risedle is ERC20, Ownable, ReentrancyGuard {
@@ -743,81 +746,260 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice buyCollateral buys collateral from Uniswap V3
-     * @param collateralAddress The ERC20 address of the collateral
-     * @param collateralAmount The amount of collateral that we need to buy
-     * @param maxSupplyOut The amount of supply that we want to pay to get the collateral
+     * @notice swapExactOutputSingle swaps assets via Uniswap V3
+     * @param tokenIn The token that we need to transfer to Uniswap V3
+     * @param tokenOut The token that we want to get from the Uniswap V3
+     * @param amountOut The amount of tokenOut that we need to buy
+     * @param amountInMaximum The maximum of token in that we want to pay to get amountOut
      * @param poolFee The uniswap pool fee: [10000, 3000, 500]
-     * @return supplyOut The amount of supply that transfered to uniswap
+     * @return amountIn The amount tokenIn that we send to Uniswap V3 to get amountOut
      */
-    function buyCollateral(
-        address collateralAddress,
-        uint256 collateralAmount,
-        uint256 maxSupplyOut,
+    function swapExactOutputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountOut,
+        uint256 amountInMaximum,
         uint24 poolFee
-    ) internal returns (uint256 supplyOut) {
+    ) internal returns (uint256 amountIn) {
         // Approve Uniswap V3 router to spend maximum amount of the supply
-        IERC20(supply).safeApprove(uniswapV3SwapRouter, maxSupplyOut);
+        IERC20(supply).safeApprove(uniswapV3SwapRouter, amountInMaximum);
 
         // Set the params, we want to get exact amount of collateral with
         // minimal supply out as possible
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter
             .ExactOutputSingleParams({
-                tokenIn: supply,
-                tokenOut: collateralAddress,
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
                 fee: poolFee,
                 recipient: address(this), // Set to this contract
                 deadline: block.timestamp,
-                amountOut: collateralAmount,
-                amountInMaximum: maxSupplyOut, // Max supply we want to pay
+                amountOut: amountOut,
+                amountInMaximum: amountInMaximum, // Max supply we want to pay
                 sqrtPriceLimitX96: 0
             });
 
         // Execute the swap
-        supplyOut = ISwapRouter(uniswapV3SwapRouter).exactOutputSingle(params);
+        amountIn = ISwapRouter(uniswapV3SwapRouter).exactOutputSingle(params);
     }
 
     /**
      * @notice getCollateralPerETF returns the collateral shares per ETF
-     * @param etf The ETF information
+     * @param etfTotalSupply The total supply of the ETF token
+     * @param etfTotalCollateral The total collateral managed by the ETF
+     * @param etfTotalETFPendingFees The total pending fees in the ETF
+     * @param etfCollateralDecimals The collateral decimals
      * @return collateralPerETF The amount of collateral per ETF (e.g. 0.5 ETH is 0.5*1e18)
      */
-    function getCollateralPerETF(ETFInfo memory etf)
-        internal
-        view
-        returns (uint256 collateralPerETF)
-    {
-        // Get the current total supply of the ETF token
-        uint256 totalSupply = IERC20(etf.token).totalSupply();
-        if (totalSupply == 0) return 0;
+    function getCollateralPerETF(
+        uint256 etfTotalSupply,
+        uint256 etfTotalCollateral,
+        uint256 etfTotalETFPendingFees,
+        uint8 etfCollateralDecimals
+    ) internal pure returns (uint256 collateralPerETF) {
+        if (etfTotalSupply == 0) return 0;
 
         // Get collateral per etf
         collateralPerETF =
-            ((etf.totalCollateral - etf.totalPendingFees) *
-                (10**etf.collateralDecimals)) /
-            totalSupply;
+            ((etfTotalCollateral - etfTotalETFPendingFees) *
+                (10**etfCollateralDecimals)) /
+            etfTotalSupply;
     }
 
     /**
      * @notice getDebtPerETF returns the debt shares per ETF
-     * @param etf The ETF information
+     * @param etfToken The address of ETF token (ERC20)
+     * @param etfTotalSupply The current total supply of the ETF token
+     * @param etfCollateralDecimals The decimals of the collateral token
      * @return debtPerETF The amount of debt per ETF (e.g. 80 USDC is 80*1e6)
      */
-    function getDebtPerETF(ETFInfo memory etf)
-        internal
-        view
-        returns (uint256 debtPerETF)
-    {
-        // Get the current total supply of the ETF token
-        uint256 totalSupply = IERC20(etf.token).totalSupply();
-        if (totalSupply == 0) return 0;
+    function getDebtPerETF(
+        address etfToken,
+        uint256 etfTotalSupply,
+        uint8 etfCollateralDecimals
+    ) internal view returns (uint256 debtPerETF) {
+        if (etfTotalSupply == 0) return 0;
 
         // Get total ETF debt
-        uint256 totalDebt = getOutstandingDebt(etf.token);
+        uint256 totalDebt = getOutstandingDebt(etfToken);
         if (totalDebt == 0) return 0;
 
         // Get collateral per etf
-        debtPerETF = (totalDebt * (10**etf.collateralDecimals)) / totalSupply;
+        debtPerETF = (totalDebt * (10**etfCollateralDecimals)) / etfTotalSupply;
     }
 
+    /**
+     * @notice calculateETFNAV calculates the net-asset value of the ETF
+     * @param collateralPerETF The amount of collateral per ETF (e.g 0.5 ETH is 0.5*1e18)
+     * @param debtPerETF The amount of debt per ETF (e.g. 50 USDC is 50*1e6)
+     * @param collateralPrice The collateral price in term of supply asset (e.g 100 USDC is 100*1e6)
+     * @param etfInitialPrice The initial price of the ETF in terms od supply asset (e.g. 100 USDC is 100*1e6)
+     * @param etfCollateralDecimals The decimals of the collateral token
+     * @return etfNAV The NAV price of the ETF in term of vault underlying asset (e.g. 50 USDC is 50*1e6)
+     */
+    function calculateETFNAV(
+        uint256 collateralPerETF,
+        uint256 debtPerETF,
+        uint256 collateralPrice,
+        uint256 etfInitialPrice,
+        uint8 etfCollateralDecimals
+    ) internal pure returns (uint256 etfNAV) {
+        if (collateralPerETF == 0 || debtPerETF == 0) return etfInitialPrice;
+
+        // Get the collateral value in term of the supply
+        uint256 collateralValuePerETF = (collateralPerETF * collateralPrice) /
+            (10**etfCollateralDecimals);
+
+        // Calculate the NAV
+        etfNAV = collateralValuePerETF - debtPerETF;
+    }
+
+    /**
+     * @notice setETFDebtStates sets the debt of the ETF token
+     * @param etf The address of the ETF token
+     * @param borrowAmount The amount that borrowed by the ETF
+     */
+    function setETFDebtStates(address etf, uint256 borrowAmount) internal {
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        uint256 borrowProportion = (borrowAmount * 1 ether) /
+            debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[etf] = debtProportion[etf] + borrowProportion;
+    }
+
+    /**
+     * @notice getETFMintAmount returns the amount of ETF token need to be minted
+     * @param collateralAmount The amount of collateral
+     * @param collateralPrice The price of the collateral in term of supply (e.g. ETH/USDC)
+     * @param borrowAmount The amount of supply borrowed to 2x leverage the collateralAmount
+     * @return mintedAmount The amount of ETF token need to be minted
+     */
+    function getETFMintAmount(
+        ETFInfo memory etfInfo,
+        uint256 collateralAmount,
+        uint256 collateralPrice,
+        uint256 borrowAmount
+    ) internal view returns (uint256 mintedAmount) {
+        // We Got 2 x collateralAmount and borrowAmount
+        // Get the collateralPerETF & debtPerETF
+        uint256 etfTotalSupply = IERC20(etfInfo.token).totalSupply();
+        uint256 collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfInfo.totalCollateral,
+            etfInfo.totalPendingFees,
+            etfInfo.collateralDecimals
+        );
+        uint256 debtPerETF = getDebtPerETF(
+            etfInfo.token,
+            etfTotalSupply,
+            etfInfo.collateralDecimals
+        );
+
+        // Calculate the net-asset value of the ETF in term of underlying
+        uint256 etfNAV = calculateETFNAV(
+            collateralPerETF,
+            debtPerETF,
+            collateralPrice,
+            etfInfo.initialPrice,
+            etfInfo.collateralDecimals
+        );
+
+        // Calculate the total investment
+        // totalInvestment = 2 x collateralValue - borrowAmount
+        uint256 totalInvestment = ((2 * collateralAmount * collateralPrice) /
+            (10**etfInfo.collateralDecimals)) - borrowAmount;
+
+        // Get minted amount
+        mintedAmount =
+            (totalInvestment * (10**etfInfo.collateralDecimals)) /
+            etfNAV;
+    }
+
+    /**
+     * @notice borrowAndSwap borrow supply asset from the vault and buy more collateral
+     * @param etfInfo The ETF information
+     * @param collateralAmount The amount of collateral
+     * @param collateralPrice The price of colalteral relative to the supply (e.g. ETH/USDC)
+     * @return borrowAmount The amount of supply borrowed to 2x leverage the collateralAmount
+     */
+    function borrowAndSwap(
+        ETFInfo memory etfInfo,
+        uint256 collateralAmount,
+        uint256 collateralPrice
+    ) internal returns (uint256 borrowAmount) {
+        // Get the collateral value
+        uint256 collateralValue = (collateralAmount * collateralPrice) /
+            (10**etfInfo.collateralDecimals);
+
+        // Get the price threshold
+        uint256 threshold = getPriceThreshold(collateralValue);
+        uint256 maxSupplyOut = collateralValue + threshold;
+
+        // Make sure we do have enough supply available
+        require(getTotalAvailableCash() > maxSupplyOut, "!NotEnoughSupply");
+
+        // Buy more collateral from Uniswap V3
+        borrowAmount = swapExactOutputSingle(
+            supply,
+            etfInfo.collateral,
+            collateralAmount,
+            maxSupplyOut,
+            etfInfo.uniswapV3PoolFee
+        );
+    }
+
+    /**
+     * @notice Mint new ETF token
+     * @param etf The address of registered ETF token
+     * @param amount The collateral amount
+     */
+    function mint(address etf, uint256 amount) external nonReentrant {
+        // Accrue interest
+        accrueInterest();
+        // Get the ETF info
+        ETFInfo memory etfInfo = etfs[etf];
+        require(etfInfo.feeInEther > 0, "!ETF"); // Make sure the ETF is exists
+
+        // Transfer the collateral to the vault
+        IERC20(etfInfo.collateral).safeTransferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
+
+        // Get the collateral and fee amount
+        (
+            uint256 collateralAmount,
+            uint256 feeAmount
+        ) = getCollateralAndFeeAmount(amount, etfInfo.feeInEther);
+
+        // Update the ETF info
+        etfs[etfInfo.token].totalCollateral += ((2 * collateralAmount) +
+            feeAmount);
+        etfs[etfInfo.token].totalPendingFees += feeAmount;
+
+        // Get the current price of ETF underlying asset (collateral)
+        // in term of vault underlying asset (supply) (e.g. ETH/USDC)
+        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+
+        // Get the borrow amount
+        uint256 borrowAmount = borrowAndSwap(
+            etfInfo,
+            collateralAmount,
+            collateralPrice
+        );
+
+        // Set ETF debt states
+        setETFDebtStates(etfInfo.token, borrowAmount);
+
+        uint256 mintedAmount = getETFMintAmount(
+            etfInfo,
+            collateralAmount,
+            collateralPrice,
+            borrowAmount
+        );
+
+        // Transfer ETF token to the caller
+        IRisedleETFToken(etf).mint(msg.sender, mintedAmount);
+    }
 }

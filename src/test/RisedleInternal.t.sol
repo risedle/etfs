@@ -614,7 +614,7 @@ contract RisedleInternalTest is
     }
 
     /// @notice Make sure buy collateral is working
-    function test_BuyCollateral() public {
+    function test_SwapExactOutputSingle() public {
         uint256 wethUSDC = getCollateralPrice(CHAINLINK_ETH_USD);
         uint256 collateralAmount = 1 ether;
         uint256 maxSupplyOut = wethUSDC + getPriceThreshold(wethUSDC);
@@ -624,7 +624,8 @@ contract RisedleInternalTest is
         hevm.setUSDCBalance(address(this), maxSupplyOut);
 
         // Buy the collateral
-        uint256 supplyOut = buyCollateral(
+        uint256 supplyOut = swapExactOutputSingle(
+            USDC_ADDRESS,
             WETH_ADDRESS,
             collateralAmount,
             maxSupplyOut,
@@ -643,226 +644,156 @@ contract RisedleInternalTest is
 
     /// @notice Make sure the collateral per ETF is working as expected
     function test_GetCollateralPerETF() public {
-        // Set this contract as governance
-        address governance = address(this);
-        uint8 decimals = 18; // Similar to WETH
-        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
-
         uint256 collateralPerETF;
-        uint256 totalSupply;
-        uint256 totalCollateral;
-        uint256 totalPendingFees;
-        ETFInfo memory etfInfo;
+        uint256 etfTotalSupply;
+        uint256 etfTotalCollateral;
+        uint256 etfTotalPendingFees;
+        uint8 etfCollateralDecimals;
 
-        // Create new Risedle ETF token
-        RisedleETFToken token = new RisedleETFToken(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            governance,
-            decimals
+        // Initial state, collateral per ETF should be zero
+        etfTotalSupply = 0;
+        etfTotalCollateral = 0;
+        etfTotalPendingFees = 0;
+        etfCollateralDecimals = 18;
+        collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfTotalCollateral,
+            etfTotalPendingFees,
+            etfCollateralDecimals
         );
-
-        /// Create new Risedle ETF
-        // totalCollateral managed by ETF = 0
-        // totalPendingFees in ETF = 0
-        // totalSupply of etf token = 0
-        // Expected collateralPerETF is zero
-        etfInfo = ETFInfo(
-            address(token),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            0,
-            0,
-            500
-        );
-        collateralPerETF = getCollateralPerETF(etfInfo);
         assertEq(collateralPerETF, 0);
 
-        // Set the states
-        totalCollateral = 9 ether;
-        totalPendingFees = 1 ether;
-        totalSupply = 10 ether;
-        etfInfo = ETFInfo(
-            address(token),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            totalCollateral,
-            totalPendingFees,
-            500
+        // Set ETF states
+        etfTotalSupply = 10 ether;
+        etfTotalCollateral = 9 ether;
+        etfTotalPendingFees = 1 ether;
+        etfCollateralDecimals = 18;
+        collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfTotalCollateral,
+            etfTotalPendingFees,
+            etfCollateralDecimals
         );
-        token.mint(recipient, totalSupply); // Inflate the supply
-        collateralPerETF = getCollateralPerETF(etfInfo);
         assertEq(collateralPerETF, 0.8 ether);
-        token.burn(recipient, totalSupply); // Restore the total supply
 
         // User very large number
-        totalCollateral = (9 * 1e12) * 1 ether; // 9 trillion ether
-        totalPendingFees = (1 * 1e12) * 1 ether; // 1 trillion ether
-        totalSupply = (10 * 1e12) * 1 ether; // 10 trillion ether
-        etfInfo = ETFInfo(
-            address(token),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            totalCollateral,
-            totalPendingFees,
-            500
+        etfTotalSupply = (10 * 1e12) * 1 ether;
+        etfTotalCollateral = (9 * 1e12) * 1 ether;
+        etfTotalPendingFees = (1 * 1e12) * 1 ether;
+        etfCollateralDecimals = 18;
+        collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfTotalCollateral,
+            etfTotalPendingFees,
+            etfCollateralDecimals
         );
-        token.mint(recipient, totalSupply); // Inflate the supply
-        collateralPerETF = getCollateralPerETF(etfInfo);
         assertEq(collateralPerETF, 0.8 ether);
-        token.burn(recipient, totalSupply); // Restore the total supply
     }
 
     /// @notice Make sure it fails when totalPendingFees > totalCollateral
-    function testFail_GetCollateralPerETFFeeTooLarge() public {
-        // Set this contract as governance
-        address governance = address(this);
-        uint8 decimals = 18; // Similar to WETH
-        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
-
-        // Create new Risedle ETF token
-        RisedleETFToken token = new RisedleETFToken(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            governance,
-            decimals
+    function testFail_GetCollateralPerETFFeeTooLarge() public pure {
+        // Test too large fees
+        uint256 etfTotalSupply = 10 ether;
+        uint256 etfTotalCollateral = 12 ether;
+        uint256 etfTotalPendingFees = 15 ether;
+        uint8 etfCollateralDecimals = 18;
+        // This should be failed
+        getCollateralPerETF(
+            etfTotalSupply,
+            etfTotalCollateral,
+            etfTotalPendingFees,
+            etfCollateralDecimals
         );
+    }
 
-        /// Create new Risedle ETF
-        uint256 totalCollateral = 1 ether;
-        uint256 totalPendingFees = 9 ether;
-        uint256 totalSupply = 10 ether;
-        ETFInfo memory etfInfo = ETFInfo(
-            address(token),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            totalCollateral,
-            totalPendingFees,
-            500
-        );
-        token.mint(recipient, totalSupply); // Inflate the supply
-        getCollateralPerETF(etfInfo); // should be failed
+    // Utils to set the total debt of given ETF
+    function setETFDebt(address etfToken, uint256 borrowAmount) internal {
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        uint256 borrowProportion = (borrowAmount * 1 ether) /
+            debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[etfToken] = debtProportion[etfToken] + borrowProportion;
     }
 
     /// @notice Make sure getDebtPerETF is correct
     function test_GetDebtPerETF() public {
-        // Set this contract as governance
-        address governance = address(this);
-        uint8 decimals = 18; // Similar to WETH
-        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
+        address etfToken;
         uint256 borrowAmount;
-        uint256 borrowProportion;
-        uint256 debtProportionRateInEther;
-        uint256 totalSupply;
+        uint256 etfTotalSupply;
         uint256 debtPerETF;
+        uint8 etfCollateralDecimals = 18;
 
-        // Create new Risedle ETF token
-        RisedleETFToken token1 = new RisedleETFToken(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            governance,
-            decimals
+        // Initial state it should be zero
+        etfToken = hevm.addr(1);
+        borrowAmount = 0;
+        setETFDebt(etfToken, borrowAmount);
+        etfTotalSupply = 0;
+        debtPerETF = getDebtPerETF(
+            etfToken,
+            etfTotalSupply,
+            etfCollateralDecimals
         );
-
-        // If ETF is not borrowed yet then the debt should be zero
-        ETFInfo memory etfInfo1 = ETFInfo(
-            address(token1),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            0,
-            0,
-            500
-        );
-        debtPerETF = getDebtPerETF(etfInfo1);
         assertEq(debtPerETF, 0);
 
         // Create new Risedle ETF token
-        // Simulate the borrow
-        RisedleETFToken token2 = new RisedleETFToken(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            governance,
-            decimals
+        etfToken = hevm.addr(2);
+        borrowAmount = 1000 * 1e6; // 1K USDC
+        setETFDebt(etfToken, borrowAmount);
+        etfTotalSupply = 10 ether;
+        debtPerETF = getDebtPerETF(
+            etfToken,
+            etfTotalSupply,
+            etfCollateralDecimals
         );
-        ETFInfo memory etfInfo2 = ETFInfo(
-            address(token2),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            0,
-            0,
-            500
-        );
-
-        // Set the outstanding debt
-        borrowAmount = 1000 * 1e6; // 100 USDC
-        totalSupply = 10 ether;
-        debtProportionRateInEther = getDebtProportionRateInEther();
-        totalOutstandingDebt += borrowAmount;
-        borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
-        totalDebtProportion += borrowProportion;
-        debtProportion[address(token2)] =
-            debtProportion[address(token2)] +
-            borrowProportion;
-
-        // Inflate the total supply of ETF token
-        token2.mint(recipient, totalSupply);
-
-        // Make sure the debt is refected to the ETF
-        debtPerETF = getDebtPerETF(etfInfo2);
-        assertEq(debtPerETF, 100 * 1e6);
+        assertEq(debtPerETF, 100 * 1e6); // 100 USDC per ETF
 
         // Let's simulate other ETF borrow once again
-        RisedleETFToken token3 = new RisedleETFToken(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            governance,
-            decimals
+        etfToken = hevm.addr(3);
+        borrowAmount = 2000 * 1e6; // 2K USDC
+        setETFDebt(etfToken, borrowAmount);
+        etfTotalSupply = 10 ether;
+        debtPerETF = getDebtPerETF(
+            etfToken,
+            etfTotalSupply,
+            etfCollateralDecimals
         );
-        ETFInfo memory etfInfo3 = ETFInfo(
-            address(token3),
-            WETH_ADDRESS,
-            18,
-            CHAINLINK_ETH_USD,
-            100 * 1e6,
-            0.001 ether,
-            0,
-            0,
-            500
+        assertEq(debtPerETF, 200 * 1e6); // 200 USDC per ETF
+    }
+
+    /// @notice Make sure the NAV calculation is correct
+    function test_CalculateETFNAV() public {
+        uint256 etfNAV;
+        uint256 collateralPerETF;
+        uint256 debtPerETF;
+        uint256 collateralPrice;
+        uint256 etfInitialPrice = 100 * 1e6; // 100 USDC
+        uint8 etfCollateralDecimals = 18;
+
+        // Initial state should be the initial price
+        collateralPerETF = 0;
+        debtPerETF = 0; // 1.2K USDC
+        collateralPrice = 0; // 3.2K USDC
+        etfNAV = calculateETFNAV(
+            collateralPerETF,
+            debtPerETF,
+            collateralPrice,
+            etfInitialPrice,
+            etfCollateralDecimals
         );
-        borrowAmount = 2000 * 1e6; // 2000 USDC
-        totalSupply = 10 ether;
-        debtProportionRateInEther = getDebtProportionRateInEther();
-        totalOutstandingDebt += borrowAmount;
-        borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
-        totalDebtProportion += borrowProportion;
-        debtProportion[address(token3)] =
-            debtProportion[address(token3)] +
-            borrowProportion;
+        assertEq(etfNAV, etfInitialPrice);
 
-        // Inflate the total supply of ETF token
-        token3.mint(recipient, totalSupply);
-
-        // Make sure the debt is correct altough there is
-        // another ETF that already borrowed supply
-        debtPerETF = getDebtPerETF(etfInfo3);
-        assertEq(debtPerETF, 200 * 1e6);
+        // Set the collateralPerETF and debtPerETF
+        collateralPerETF = 0.9 ether;
+        debtPerETF = 1200 * 1e6; // 1.2K USDC
+        collateralPrice = 3200 * 1e6; // 3.2K USDC
+        etfNAV = calculateETFNAV(
+            collateralPerETF,
+            debtPerETF,
+            collateralPrice,
+            etfInitialPrice,
+            etfCollateralDecimals
+        );
+        assertEq(etfNAV, 1680 * 1e6);
     }
 }

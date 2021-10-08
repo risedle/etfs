@@ -14,6 +14,12 @@ pragma experimental ABIEncoderV2;
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
+interface IRisedleETFToken {
+    function mint(address to, uint256 amount) external;
+
+    function burn(address from, uint256 amount) external;
+}
+
 contract RisedleETFToken is ERC20, Ownable {
     uint8 private _decimals;
 
@@ -34,8 +40,8 @@ contract RisedleETFToken is ERC20, Ownable {
         return _decimals;
     }
 
-    function mint(address recipient, uint256 amount) external onlyOwner {
-        _mint(recipient, amount);
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
     }
 
     function burn(address from, uint256 amount) external onlyOwner {
