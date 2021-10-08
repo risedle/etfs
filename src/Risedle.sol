@@ -44,12 +44,12 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice The total debt proportion issued by the vault, the usage is
     ///         similar to the vault token supply. In order to track the
-    ///         outstanding debt of the borrower
+    ///         outstanding debt of the ETF
     uint256 internal totalDebtProportion;
 
-    /// @notice Mapping borrower to their debt proportion of totalOutstandingDebt
-    /// @dev debt = _debtProportion[borrower] * debtProportionRate
-    mapping(address => uint256) private _debtProportion;
+    /// @notice Mapping ETF to their debt proportion of totalOutstandingDebt
+    /// @dev debt = debtProportion[ETF] * debtProportionRate
+    mapping(address => uint256) internal debtProportion;
 
     /// @notice Optimal utilization rate in ether units
     uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
@@ -123,14 +123,14 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 redeemedAmount
     );
 
-    /// @notice Event emitted when borrower borrow from the vault
+    /// @notice Event emitted when ETF borrow from the vault
     event Borrowed(
         address indexed account,
         uint256 amount,
         uint256 debtProportionRateInEther
     );
 
-    /// @notice Event emitted when borrower repay to the vault
+    /// @notice Event emitted when ETF repay to the vault
     event Repaid(
         address indexed account,
         uint256 amount,
@@ -512,20 +512,24 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     /**
      * @notice getDebtProportionRateInEther returns the proportion of borrow
      *         amount relative to the totalOutstandingDebt
-     * @return The debt proportion rate in ether units
+     * @return debtProportionRateInEther The debt proportion rate in ether units
      */
-    function getDebtProportionRateInEther() internal view returns (uint256) {
+    function getDebtProportionRateInEther()
+        internal
+        view
+        returns (uint256 debtProportionRateInEther)
+    {
         if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
             return 1 ether;
         }
-        uint256 debtProportionRateInEther = (totalOutstandingDebt * 1 ether) /
+        debtProportionRateInEther =
+            (totalOutstandingDebt * 1 ether) /
             totalDebtProportion;
-        return debtProportionRateInEther;
     }
 
     /**
-     * @notice getOutstandingDebt returns the debt owed by the borrower
-     * @param account The borrower address
+     * @notice getOutstandingDebt returns the debt owed by the ETF
+     * @param account The ETF address
      */
     function getOutstandingDebt(address account) public view returns (uint256) {
         // If there is no debt, return 0
@@ -536,7 +540,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         // Calculate the outstanding debt
         // outstanding debt = debtProportion * debtProportionRate
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        uint256 a = (_debtProportion[account] * debtProportionRateInEther);
+        uint256 a = (debtProportion[account] * debtProportionRateInEther);
         uint256 b = 1 ether;
         uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
 
@@ -793,4 +797,27 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
                 (10**etf.collateralDecimals)) /
             totalSupply;
     }
+
+    /**
+     * @notice getDebtPerETF returns the debt shares per ETF
+     * @param etf The ETF information
+     * @return debtPerETF The amount of debt per ETF (e.g. 80 USDC is 80*1e6)
+     */
+    function getDebtPerETF(ETFInfo memory etf)
+        internal
+        view
+        returns (uint256 debtPerETF)
+    {
+        // Get the current total supply of the ETF token
+        uint256 totalSupply = IERC20(etf.token).totalSupply();
+        if (totalSupply == 0) return 0;
+
+        // Get total ETF debt
+        uint256 totalDebt = getOutstandingDebt(etf.token);
+        if (totalDebt == 0) return 0;
+
+        // Get collateral per etf
+        debtPerETF = (totalDebt * (10**etf.collateralDecimals)) / totalSupply;
+    }
+
 }

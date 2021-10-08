@@ -755,4 +755,114 @@ contract RisedleInternalTest is
         token.mint(recipient, totalSupply); // Inflate the supply
         getCollateralPerETF(etfInfo); // should be failed
     }
+
+    /// @notice Make sure getDebtPerETF is correct
+    function test_GetDebtPerETF() public {
+        // Set this contract as governance
+        address governance = address(this);
+        uint8 decimals = 18; // Similar to WETH
+        address recipient = hevm.addr(1); // Random address uses to manipulate the etf token supply
+        uint256 borrowAmount;
+        uint256 borrowProportion;
+        uint256 debtProportionRateInEther;
+        uint256 totalSupply;
+        uint256 debtPerETF;
+
+        // Create new Risedle ETF token
+        RisedleETFToken token1 = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            governance,
+            decimals
+        );
+
+        // If ETF is not borrowed yet then the debt should be zero
+        ETFInfo memory etfInfo1 = ETFInfo(
+            address(token1),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            0,
+            0,
+            500
+        );
+        debtPerETF = getDebtPerETF(etfInfo1);
+        assertEq(debtPerETF, 0);
+
+        // Create new Risedle ETF token
+        // Simulate the borrow
+        RisedleETFToken token2 = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            governance,
+            decimals
+        );
+        ETFInfo memory etfInfo2 = ETFInfo(
+            address(token2),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            0,
+            0,
+            500
+        );
+
+        // Set the outstanding debt
+        borrowAmount = 1000 * 1e6; // 100 USDC
+        totalSupply = 10 ether;
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[address(token2)] =
+            debtProportion[address(token2)] +
+            borrowProportion;
+
+        // Inflate the total supply of ETF token
+        token2.mint(recipient, totalSupply);
+
+        // Make sure the debt is refected to the ETF
+        debtPerETF = getDebtPerETF(etfInfo2);
+        assertEq(debtPerETF, 100 * 1e6);
+
+        // Let's simulate other ETF borrow once again
+        RisedleETFToken token3 = new RisedleETFToken(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            governance,
+            decimals
+        );
+        ETFInfo memory etfInfo3 = ETFInfo(
+            address(token3),
+            WETH_ADDRESS,
+            18,
+            CHAINLINK_ETH_USD,
+            100 * 1e6,
+            0.001 ether,
+            0,
+            0,
+            500
+        );
+        borrowAmount = 2000 * 1e6; // 2000 USDC
+        totalSupply = 10 ether;
+        debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[address(token3)] =
+            debtProportion[address(token3)] +
+            borrowProportion;
+
+        // Inflate the total supply of ETF token
+        token3.mint(recipient, totalSupply);
+
+        // Make sure the debt is correct altough there is
+        // another ETF that already borrowed supply
+        debtPerETF = getDebtPerETF(etfInfo3);
+        assertEq(debtPerETF, 200 * 1e6);
+    }
 }
