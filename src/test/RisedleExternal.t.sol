@@ -68,7 +68,7 @@ contract Investor {
         IERC20(collateral).approve(address(_vault), type(uint256).max);
 
         // Mint new ETF token
-        _vault.mint(etf, amount);
+        _vault.invest(etf, amount);
     }
 
     function redeem(address etf, uint256 amount) public {
@@ -76,7 +76,7 @@ contract Investor {
         IERC20(etf).approve(address(_vault), type(uint256).max);
 
         // Mint new ETF token
-        _vault.burn(etf, amount);
+        _vault.redeem(etf, amount);
     }
 }
 

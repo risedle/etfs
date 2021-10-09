@@ -959,7 +959,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @param etf The address of registered ETF token
      * @param amount The collateral amount
      */
-    function mint(address etf, uint256 amount) external nonReentrant {
+    function invest(address etf, uint256 amount) external nonReentrant {
         // Accrue interest
         accrueInterest();
         // Get the ETF info
@@ -1047,7 +1047,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @param etf The address of the ETF token
      * @param amount The mount of ETF token need to be burned
      */
-    function burn(address etf, uint256 amount) external nonReentrant {
+    function redeem(address etf, uint256 amount) external nonReentrant {
         // Accrue interest
         accrueInterest();
         // Get the ETF info
