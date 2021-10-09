@@ -770,6 +770,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Execute the swap
         amountIn = ISwapRouter(uniswapV3SwapRouter).exactOutputSingle(params);
+
+        // Set approval back to zero
+        IERC20(tokenIn).safeApprove(uniswapV3SwapRouter, 0);
     }
 
     /**
