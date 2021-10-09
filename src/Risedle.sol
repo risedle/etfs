@@ -1113,6 +1113,6 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         // Send the remaining collateral to the investor minus the fee
         IERC20(etfInfo.collateral).safeTransfer(msg.sender, redeemAmount);
 
-        emit ETFBurned(msg.sender, etf, amount);
+        emit ETFBurned(msg.sender, etf, redeemAmount);
     }
 }
