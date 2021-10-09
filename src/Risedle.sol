@@ -637,7 +637,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @param collateral The underlying token of ETF (e.g. WETH)
      * @param chainlinkFeed Chainlink feed (e.g. ETH/USD)
      * @param initialPrice Initial price of the ETF based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
-     * @param feeInEther Creation and redemption fee in ether units
+     * @param feeInEther Creation and redemption fee in ether units (e.g. 0.001 ether = 0.1%)
      */
     function createNewETF(
         address token,
@@ -844,6 +844,43 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice getETFNAV gets the ETF net-asset value
+     * @dev This is used for front end
+     * @param etf The ETF token address
+     * @return etfNAV The NAV price of the ETF in term of vault underlying asset (e.g. 50 USDC is 50*1e6)
+     */
+    function getETFNAV(address etf) public view returns (uint256 etfNAV) {
+        ETFInfo memory etfInfo = etfs[etf];
+        if (etfInfo.feeInEther == 0) return 0;
+
+        // Get the current price of ETF underlying asset (collateral)
+        // in term of vault underlying asset (supply) (e.g. ETH/USDC)
+        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+
+        // Get collateral per etf and debt per etf
+        uint256 etfTotalSupply = IERC20(etfInfo.token).totalSupply();
+        uint256 collateralPerETF = getCollateralPerETF(
+            etfTotalSupply,
+            etfInfo.totalCollateral,
+            etfInfo.totalPendingFees,
+            etfInfo.collateralDecimals
+        );
+        uint256 debtPerETF = getDebtPerETF(
+            etfInfo.token,
+            etfTotalSupply,
+            etfInfo.collateralDecimals
+        );
+
+        etfNAV = calculateETFNAV(
+            collateralPerETF,
+            debtPerETF,
+            collateralPrice,
+            etfInfo.initialPrice,
+            etfInfo.collateralDecimals
+        );
+    }
+
+    /**
      * @notice setETFBorrowStates sets the debt of the ETF token
      * @param etf The address of the ETF token
      * @param borrowAmount The amount that borrowed by the ETF
@@ -870,29 +907,8 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 collateralPrice,
         uint256 borrowAmount
     ) internal view returns (uint256 mintedAmount) {
-        // We Got 2 x collateralAmount and borrowAmount
-        // Get the collateralPerETF & debtPerETF
-        uint256 etfTotalSupply = IERC20(etfInfo.token).totalSupply();
-        uint256 collateralPerETF = getCollateralPerETF(
-            etfTotalSupply,
-            etfInfo.totalCollateral,
-            etfInfo.totalPendingFees,
-            etfInfo.collateralDecimals
-        );
-        uint256 debtPerETF = getDebtPerETF(
-            etfInfo.token,
-            etfTotalSupply,
-            etfInfo.collateralDecimals
-        );
-
         // Calculate the net-asset value of the ETF in term of underlying
-        uint256 etfNAV = calculateETFNAV(
-            collateralPerETF,
-            debtPerETF,
-            collateralPrice,
-            etfInfo.initialPrice,
-            etfInfo.collateralDecimals
-        );
+        uint256 etfNAV = getETFNAV(etfInfo.token);
 
         // Calculate the total investment
         // totalInvestment = 2 x collateralValue - borrowAmount
