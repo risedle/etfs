@@ -3,6 +3,17 @@
 // Risedle Market Contract
 // It implements money market, ETF creation, redemption and rebalancing mechanism.
 //
+// ┌───────Risedle Market────────┐    ┌─────────┐
+// │                             ├───►│Chainlink│
+// │ ┌───────────┐ ┌───────────┐ │    └─────────┘
+// │ │Risedle ETF│ │Risedle ETF│ │
+// │ └───────────┘ └───────────┘ │    ┌──────────┐
+// │                             ├───►│Uniswap V3│
+// │ ┌─────────────────────────┐ │    └──────────┘
+// │ │      Risedle Vault      │ │
+// │ └─────────────────────────┘ │
+// └─────────────────────────────┘
+//
 // The interest rate model is available here: https://observablehq.com/@pyk/ethrise
 // Risedle uses ether units (1e18) precision to represent the interest rates.
 // Learn more here: https://docs.soliditylang.org/en/v0.8.7/units-and-global-variables.html
