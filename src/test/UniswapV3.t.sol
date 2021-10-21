@@ -33,7 +33,6 @@ contract UniswapV3Test is DSTest {
         // Gimana cara swap USDC ke WETH
         uint24 poolFee = 500;
         uint256 amountInMaximum = 10000 * 1e6; // We use oracle to determine the amountInMaximum
-        address recipient = hevm.addr(1);
         ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter
             .ExactOutputSingleParams({
                 tokenIn: USDC_ADDRESS,
@@ -58,12 +57,10 @@ contract UniswapV3Test is DSTest {
         // uint256 gas = gasleft();
 
         // Collaterals
-        address collateralAddress = WETH_ADDRESS;
         uint8 collateralDecimals = 18;
         address collateralFeed = CHAINLINK_ETH_USD;
 
         // Supplies
-        address supplyAddress = USDC_ADDRESS;
         uint8 supplyDecimals = 6;
         address supplyFeed = CHAINLINK_USDC_USD;
 
