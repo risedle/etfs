@@ -51,65 +51,65 @@ Use this command to run the test against Arbitrum One mainnet:
 
 here is the example output:
 
-      Running 1 tests for src/test/ChainlinkPrice.t.sol:ChainlinkTest
-      [PASS] test_getETHUSDCPrice() (gas: 52852)
+      [PASS] test_getETHUSDCPrice() (gas: 57539)
 
       Running 1 tests for src/test/CurveSwap.t.sol:CurveSwapTest
-      [PASS] test_SwapUSDCToWETH() (gas: 24446)
+      [PASS] test_SwapUSDCToWETH() (gas: 27533)
 
       Running 3 tests for src/test/Hevm.t.sol:HevmTest
-      [PASS] test_setUSDTBalance() (gas: 11008)
-      [PASS] test_setWETHBalance() (gas: 8476)
-      [PASS] test_setUSDCBalance() (gas: 15769)
-
-      Running 8 tests for src/test/RisedleAccessControl.t.sol:RisedleAccessControlTest
-      [PASS] test_GovernanceIsProperlySet() (gas: 3401666)
-      [PASS] test_GovernanceCanSetFeeRecipientAddress() (gas: 3404592)
-      [PASS] testFail_NonGovernanceCannotSetFeeRecipientAddress() (gas: 3407248)
-      [PASS] testFail_NonGovernanceCannotSetVaultParameters() (gas: 3405915)
-      [PASS] test_GovernanceCanSetVaultParameters() (gas: 3406520)
-      [PASS] testFail_NonGovernanceCannotCreateNewETF() (gas: 3407678)
-      [PASS] test_GovernanceCanCreateNewETF() (gas: 3550337)
-      [PASS] test_AnyoneCanAccrueInterest() (gas: 3406522)
+      [PASS] test_setUSDTBalance() (gas: 13698)
+      [PASS] test_setWETHBalance() (gas: 11267)
+      [PASS] test_setUSDCBalance() (gas: 18526)
 
       Running 4 tests for src/test/RisedleETFTokenAccessControl.t.sol:RisedleETFTokenAccessControl
-      [PASS] testFail_NonGovernanceCannotMintToken() (gas: 1059225)
-      [PASS] testFail_NonGovernanceCannotBurnToken() (gas: 1110626)
-      [PASS] test_GovernanceCanBurnToken() (gas: 1110108)
-      [PASS] test_GovernanceCanMintToken() (gas: 1106652)
+      [PASS] testFail_NonGovernanceCannotMintToken() (gas: 1660983)
+      [PASS] testFail_NonGovernanceCannotBurnToken() (gas: 1715299)
+      [PASS] test_GovernanceCanBurnToken() (gas: 1713852)
+      [PASS] test_GovernanceCanMintToken() (gas: 1709342)
 
-      Running 5 tests for src/test/RisedleExternal.t.sol:RisedleExternalTest
-      [PASS] test_LenderCanRemoveSupplyFromTheVault() (gas: 4101938)
-      [PASS] test_LenderCanAddSupplytToTheVault() (gas: 4033595)
-      [PASS] test_InvestorCanMintETFToken() (gas: 5859629)
-      [PASS] testFail_InvestorCannotMintETFTokenIfNoSupplyAvailable() (gas: 5639940)
-      [PASS] test_InvestorCanRedeemETFToken() (gas: 6009168)
+      Running 8 tests for src/test/RisedleMarketAccessControl.t.sol:RisedleMarketAccessControlTest
+      [PASS] test_GovernanceIsProperlySet() (gas: 4977069)
+      [PASS] test_GovernanceCanSetFeeRecipientAddress() (gas: 4982806)
+      [PASS] testFail_NonGovernanceCannotSetFeeRecipientAddress() (gas: 4985801)
+      [PASS] testFail_NonGovernanceCannotSetVaultParameters() (gas: 4984538)
+      [PASS] test_GovernanceCanSetVaultParameters() (gas: 4984700)
+      [PASS] testFail_NonGovernanceCannotCreateNewETF() (gas: 4987469)
+      [PASS] test_GovernanceCanCreateNewETF() (gas: 5133440)
+      [PASS] test_AnyoneCanAccrueInterest() (gas: 4984059)
 
-      Running 20 tests for src/test/RisedleInternal.t.sol:RisedleInternalTest
-      [PASS] test_CalculateBorrowRatePerSecondInEther() (gas: 7250)
-      [PASS] test_CalculateETFNAV() (gas: 1157)
-      [PASS] test_GetDebtProportionRateInEther() (gas: 47423)
-      [PASS] test_GetTotalAvailableCash() (gas: 47395)
-      [PASS] test_SetVaultStates() (gas: 69390)
-      [PASS] test_VaultProperties() (gas: 16925)
-      [PASS] testFail_GetCollateralPerETFFeeTooLarge() (gas: 736)
-      [PASS] test_GetChainlinkPriceInGwei() (gas: 42523)
-      [PASS] test_GetCollateralPrice() (gas: 43197)
-      [PASS] test_GetUtilizationRateInEther() (gas: 79084)
-      [PASS] test_GetSupplyRatePerSecondInEther() (gas: 64223)
-      [PASS] test_GetBorrowRatePerSecondInEther() (gas: 49318)
-      [PASS] test_CalculateUtilizationRateInEther() (gas: 1923)
-      [PASS] test_GetExchangeRateInEther() (gas: 161268)
-      [PASS] test_AccrueInterest() (gas: 93902)
-      [PASS] test_GetCollateralAndFeeAmount() (gas: 1124)
-      [PASS] test_GetDebtPerETF() (gas: 103007)
-      [PASS] test_SwapExactOutputSingle() (gas: 178081)
-      [PASS] test_GetCollateralPerETF() (gas: 1813)
-      [PASS] test_GetInterestAmount() (gas: 1706)
+      Running 6 tests for src/test/RisedleMarketExternal.t.sol:RisedleMarketExternalTest
+      [PASS] test_LenderCanRemoveSupplyFromTheVault() (gas: 5876060)
+      [PASS] test_LenderCanAddSupplytToTheVault() (gas: 5809925)
+      [PASS] test_InvestorCanMintETFToken() (gas: 8344951)
+      [PASS] test_InvestorMintTwice() (gas: 8482115)
+      [PASS] testFail_InvestorCannotMintETFTokenIfNoSupplyAvailable() (gas: 8090668)
+      [PASS] test_InvestorCanRedeemETFToken() (gas: 8514927)
+
+      Running 20 tests for src/test/RisedleMarketInternal.t.sol:RisedleMarketInternalTest
+      [PASS] test_CalculateBorrowRatePerSecondInEther() (gas: 11466)
+      [PASS] test_CalculateETFNAV() (gas: 1781)
+      [PASS] test_GetDebtProportionRateInEther() (gas: 48288)
+      [PASS] test_GetTotalAvailableCash() (gas: 54086)
+      [PASS] test_SetVaultStates() (gas: 71021)
+      [PASS] test_VaultProperties() (gas: 19010)
+      [PASS] testFail_GetCollateralPerETFFeeTooLarge() (gas: 1042)
+      [PASS] test_GetChainlinkPriceInGwei() (gas: 44894)
+      [PASS] test_GetCollateralPrice() (gas: 46125)
+      [PASS] test_GetUtilizationRateInEther() (gas: 90497)
+      [PASS] test_GetSupplyRatePerSecondInEther() (gas: 69085)
+      [PASS] test_GetBorrowRatePerSecondInEther() (gas: 56017)
+      [PASS] test_CalculateUtilizationRateInEther() (gas: 3097)
+      [PASS] test_GetExchangeRateInEther() (gas: 170657)
+      [PASS] test_AccrueInterest() (gas: 111911)
+      [PASS] test_GetCollateralAndFeeAmount() (gas: 1906)
+      [PASS] test_GetDebtPerETF() (gas: 110703)
+      [PASS] test_SwapExactOutputSingle() (gas: 191249)
+      [PASS] test_GetCollateralPerETF() (gas: 2915)
+      [PASS] test_GetInterestAmount() (gas: 2489)
 
       Running 2 tests for src/test/UniswapV3.t.sol:UniswapV3Test
-      [PASS] test_BorrowAndSwap() (gas: 199510)
-      [PASS] test_SwapUSDCToWETH() (gas: 134780)
+      [PASS] test_BorrowAndSwap() (gas: 229397)
+      [PASS] test_SwapUSDCToWETH() (gas: 136528)
 
 ## Gas Report
 
