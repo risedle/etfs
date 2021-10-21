@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Risedle Contract
+// Risedle Market Contract
 // It implements money market, ETF creation, redemption and rebalancing mechanism.
 //
 // The interest rate model is available here: https://observablehq.com/@pyk/ethrise
@@ -26,57 +26,57 @@ import {ISwapRouter} from "./interfaces/UniswapV3.sol";
 
 import {IRisedleETFToken} from "./RisedleETFToken.sol";
 
-/// @title Risedle
-contract Risedle is ERC20, Ownable, ReentrancyGuard {
+/// @title Risedle Market
+contract RisedleMarket is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @notice The Vault's underlying asset
-    address public immutable supply;
+    /// @notice The Vault's underlying token
+    address public immutable vaultUnderlyingTokenAddress;
 
-    /// @notice The Vault's underlying asset Chainlink feed per USD (e.g. USDC/USD)
-    address internal immutable supplyFeed;
+    /// @notice The Vault's underlying token Chainlink feed per USD (e.g. USDC/USD)
+    address internal immutable vaultUnderlyingTokenFeedAddress;
 
-    /// @notice The Vault's fee recipient address
+    /// @notice The fee recipient address
     address internal feeRecipient;
 
     /// @notice The Uniswap V3 router address
     address internal immutable uniswapV3SwapRouter;
 
-    /// @notice The vault token decimals
-    uint8 private immutable _decimals;
+    /// @notice The Vault's token decimals
+    uint8 private immutable vaultTokenDecimals;
 
     /// @notice The total debt proportion issued by the vault, the usage is
     ///         similar to the vault token supply. In order to track the
     ///         outstanding debt of the ETF
-    uint256 internal totalDebtProportion;
+    uint256 internal vaultTotalDebtProportion;
 
     /// @notice Mapping ETF to their debt proportion of totalOutstandingDebt
     /// @dev debt = debtProportion[ETF] * debtProportionRate
-    mapping(address => uint256) internal debtProportion;
+    mapping(address => uint256) internal vaultDebtProportion;
 
     /// @notice Optimal utilization rate in ether units
-    uint256 internal OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
+    uint256 internal VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER = 0.9 ether; // 90% utilization
 
     /// @notice Interest slope 1 in ether units
-    uint256 internal INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
+    uint256 internal VAULT_INTEREST_SLOPE_1_IN_ETHER = 0.2 ether; // 20% slope 1
 
     /// @notice Interest slop 2 in ether units
-    uint256 internal INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
+    uint256 internal VAULT_INTEREST_SLOPE_2_IN_ETHER = 0.6 ether; // 60% slope 2
 
     /// @notice Number of seconds in a year (approximation)
     uint256 internal immutable TOTAL_SECONDS_IN_A_YEAR = 31536000;
 
     /// @notice Maximum borrow rate per second in ether units
-    uint256 internal MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
+    uint256 internal VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER = 50735667174; // 0.000000050735667174% Approx 393% APY
 
     /// @notice Performance fee for the lender
-    uint256 internal PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
+    uint256 internal VAULT_PERFORMANCE_FEE_IN_ETHER = 0.1 ether; // 10% performance fee
 
     /// @notice The total amount of principal borrowed plus interest accrued
-    uint256 public totalOutstandingDebt;
+    uint256 public vaultTotalOutstandingDebt;
 
     /// @notice The total amount of pending fees to be collected in the vault
-    uint256 public totalVaultPendingFees;
+    uint256 public vaultTotalPendingFees;
 
     /// @notice Timestamp that interest was last accrued at
     uint256 internal lastTimestampInterestAccrued;
@@ -101,17 +101,17 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     event InterestAccrued(
         uint256 previousTimestamp,
         uint256 currentTimestamp,
-        uint256 previousTotalOutstandingDebt,
-        uint256 previoustotalVaultPendingFees,
+        uint256 previousVaultTotalOutstandingDebt,
+        uint256 previousVaultTotalPendingFees,
         uint256 borrowRatePerSecondInEther,
         uint256 elapsedSeconds,
         uint256 interestAmount,
-        uint256 totalOutstandingDebt,
-        uint256 totalVaultPendingFees
+        uint256 vaultTotalOutstandingDebt,
+        uint256 vaultTotalPendingFees
     );
 
     /// @notice Event emitted when lender add supply to the vault
-    event SupplyAdded(
+    event VaultSupplyAdded(
         address indexed account,
         uint256 amount,
         uint256 ExchangeRateInEther,
@@ -119,7 +119,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     );
 
     /// @notice Event emitted when lender remove supply from the vault
-    event SupplyRemoved(
+    event VaultSupplyRemoved(
         address indexed account,
         uint256 amount,
         uint256 ExchangeRateInEther,
@@ -142,6 +142,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newFeeRecipient);
 
+    /// @notice Event emitted when new ETF is created
+    event ETFCreated(address indexed creator, address etfToken);
+
     /// @notice Event emitted when new ETF token minted
     event ETFMinted(
         address indexed investor,
@@ -157,35 +160,35 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     );
 
     /**
-     * @notice Contruct new vault
-     * @param name The Vault's token name
-     * @param symbol The Vault's token symbol
-     * @param supply_ The Vault's underlying asset
-     * @param supplyFeed_ The Vault's underlying asset Chainlink feed per USD (e.g. USDC/USD)
-     * @param supplyDecimals_ The Vault's underlying asset decimal
+     * @notice Construct new Risedle Market
+     * @param vaultTokenName The Vault's token name
+     * @param vaultTokenSymbol The Vault's token symbol
+     * @param vaultUnderlyingTokenAddress_ The Vault's underlying token address (ERC20)
+     * @param vaultUnderlyingTokenFeedAddress_ The Vault's underlying token Chainlink feed per USD (e.g. USDC/USD)
+     * @param vaultTokenDecimals_ The Vault's token decimal
      * @param uniswapV3SwapRouter_ The Uniswap V3 router address
      */
     constructor(
-        string memory name,
-        string memory symbol,
-        address supply_,
-        address supplyFeed_,
-        uint8 supplyDecimals_,
+        string memory vaultTokenName,
+        string memory vaultTokenSymbol,
+        address vaultUnderlyingTokenAddress_,
+        address vaultUnderlyingTokenFeedAddress_,
+        uint8 vaultTokenDecimals_,
         address uniswapV3SwapRouter_
-    ) ERC20(name, symbol) {
-        // Set supply asset contract address
-        supply = supply_;
+    ) ERC20(vaultTokenName, vaultTokenSymbol) {
+        // Set the vault's underlying token address (ERC20)
+        vaultUnderlyingTokenAddress = vaultUnderlyingTokenAddress_;
 
-        // Set supply asset chainlink feed
-        supplyFeed = supplyFeed_;
+        // Set the vault's underlying token chainlink feed address (e.g. USDC/USD)
+        vaultUnderlyingTokenFeedAddress = vaultUnderlyingTokenFeedAddress_;
 
         // Set vault token decimals similar to the supply
-        _decimals = supplyDecimals_;
+        vaultTokenDecimals = vaultTokenDecimals_;
 
         // Set contract deployer as fee recipient address
         feeRecipient = msg.sender;
 
-        // Initialize the last timestamp accrued
+        // Initialize the last timestamp interest accrued
         lastTimestampInterestAccrued = block.timestamp;
 
         // Set Uniswap V3 router address
@@ -195,18 +198,20 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     /// @notice Overwrite the vault token decimals
     /// @dev https://docs.openzeppelin.com/contracts/4.x/erc20
     function decimals() public view virtual override returns (uint8) {
-        return _decimals;
+        return vaultTokenDecimals;
     }
 
     /**
-     * @notice getTotalAvailableCash returns the total amount of underlying asset
-     *         that available to borrow from the Vault
-     * @return The amount of underlying asset ready to borrow
+     * @notice getTotalAvailableCash returns the total amount of vault's
+     *         underlying token that available to borrow
+     * @return The amount of vault's underlying token available to borrow
      */
     function getTotalAvailableCash() public view returns (uint256) {
-        uint256 balance = IERC20(supply).balanceOf(address(this));
-        if (totalVaultPendingFees >= balance) return 0;
-        return balance - totalVaultPendingFees;
+        uint256 vaultBalance = IERC20(vaultUnderlyingTokenAddress).balanceOf(
+            address(this)
+        );
+        if (vaultTotalPendingFees >= vaultBalance) return 0;
+        return vaultBalance - vaultTotalPendingFees;
     }
 
     /**
@@ -245,7 +250,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 totalAvailable = getTotalAvailableCash();
         utilizationRateInEther = calculateUtilizationRateInEther(
             totalAvailable,
-            totalOutstandingDebt
+            vaultTotalOutstandingDebt
         );
     }
 
@@ -262,18 +267,18 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     {
         // utilizationRateInEther should in range [0, 1e18], Otherwise return max borrow rate
         if (utilizationRateInEther >= 1 ether) {
-            return MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
+            return VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
         }
 
         // Calculate the borrow rate
         // See the formula here: https://observablehq.com/@pyk  /ethrise
-        if (utilizationRateInEther <= OPTIMAL_UTILIZATION_RATE_IN_ETHER) {
+        if (utilizationRateInEther <= VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER) {
             // Borrow rate per year = (utilization rate/optimal utilization rate) * interest slope 1
             // Borrow rate per seconds = Borrow rate per year / seconds in a year
             uint256 rateInEther = (utilizationRateInEther * 1 ether) /
-                OPTIMAL_UTILIZATION_RATE_IN_ETHER;
+                VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER;
             uint256 borrowRatePerYearInEther = (rateInEther *
-                INTEREST_SLOPE_1_IN_ETHER) / 1 ether;
+                VAULT_INTEREST_SLOPE_1_IN_ETHER) / 1 ether;
             uint256 borrowRatePerSecondInEther = borrowRatePerYearInEther /
                 TOTAL_SECONDS_IN_A_YEAR;
             return borrowRatePerSecondInEther;
@@ -281,20 +286,21 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             // Borrow rate per year = interest slope 1 + ((utilization rate - optimal utilization rate)/(1-utilization rate)) * interest slope 2
             // Borrow rate per seconds = Borrow rate per year / seconds in a year
             uint256 aInEther = utilizationRateInEther -
-                OPTIMAL_UTILIZATION_RATE_IN_ETHER;
+                VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER;
             uint256 bInEther = 1 ether - utilizationRateInEther;
             uint256 cInEther = (aInEther * 1 ether) / bInEther;
-            uint256 dInEther = (cInEther * INTEREST_SLOPE_2_IN_ETHER) / 1 ether;
-            uint256 borrowRatePerYearInEther = INTEREST_SLOPE_1_IN_ETHER +
+            uint256 dInEther = (cInEther * VAULT_INTEREST_SLOPE_2_IN_ETHER) /
+                1 ether;
+            uint256 borrowRatePerYearInEther = VAULT_INTEREST_SLOPE_1_IN_ETHER +
                 dInEther;
             uint256 borrowRatePerSecondInEther = borrowRatePerYearInEther /
                 TOTAL_SECONDS_IN_A_YEAR;
             // Cap the borrow rate
             if (
                 borrowRatePerSecondInEther >=
-                MAX_BORROW_RATE_PER_SECOND_IN_ETHER
+                VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER
             ) {
-                return MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
+                return VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
             }
 
             return borrowRatePerSecondInEther;
@@ -330,7 +336,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 borrowRateInEther = calculateBorrowRatePerSecondInEther(
             utilizationRateInEther
         );
-        uint256 nonFeeInEther = 1 ether - PERFORMANCE_FEE_IN_ETHER;
+        uint256 nonFeeInEther = 1 ether - VAULT_PERFORMANCE_FEE_IN_ETHER;
         uint256 rateForSupplyInEther = (borrowRateInEther * nonFeeInEther) /
             1 ether;
         supplyRateInEther =
@@ -370,28 +376,28 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice setVaultStates update the totalOutstandingDebt and totalVaultPendingFees
+     * @notice setVaultStates update the vaultTotalOutstandingDebt and vaultTotalOutstandingDebt
      * @param interestAmount The total of interest amount to be splitted, the decimals
-     *        is similar to totalOutstandingDebt and totalVaultPendingFees.
+     *        is similar to vaultTotalOutstandingDebt and vaultTotalOutstandingDebt.
      * @param currentTimestamp The current timestamp when the interest is accrued
      */
     function setVaultStates(uint256 interestAmount, uint256 currentTimestamp)
         internal
     {
         // Get the fee
-        uint256 feeAmount = (PERFORMANCE_FEE_IN_ETHER * interestAmount) /
+        uint256 feeAmount = (VAULT_PERFORMANCE_FEE_IN_ETHER * interestAmount) /
             1 ether;
 
         // Update the states
-        totalOutstandingDebt = totalOutstandingDebt + interestAmount;
-        totalVaultPendingFees = totalVaultPendingFees + feeAmount;
+        vaultTotalOutstandingDebt = vaultTotalOutstandingDebt + interestAmount;
+        vaultTotalPendingFees = vaultTotalPendingFees + feeAmount;
         lastTimestampInterestAccrued = currentTimestamp;
     }
 
     /**
-     * @notice accrueInterest accrues interest to totalOutstandingDebt and totalVaultPendingFees
+     * @notice accrueInterest accrues interest to vaultTotalOutstandingDebt and vaultTotalPendingFees
      * @dev This calculates interest accrued from the last checkpointed timestamp
-     *      up to the current timestamp and update the totalOutstandingDebt and totalVaultPendingFees
+     *      up to the current timestamp and update the vaultTotalOutstandingDebt and vaultTotalPendingFees
      */
     function accrueInterest() public {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
@@ -401,9 +407,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         // If currentTimestamp and previousTimestamp is similar then return early
         if (currentTimestamp == previousTimestamp) return;
 
-        // For logging purpose
-        uint256 previousTotalOutstandingDebt = totalOutstandingDebt;
-        uint256 previoustotalVaultPendingFees = totalVaultPendingFees;
+        // For event logging purpose
+        uint256 previousVaultTotalOutstandingDebt = vaultTotalOutstandingDebt;
+        uint256 previousVaultTotalPendingFees = vaultTotalPendingFees;
 
         // Get borrow rate per second
         uint256 borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
@@ -413,32 +419,32 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Get the interest amount
         uint256 interestAmount = getInterestAmount(
-            totalOutstandingDebt,
+            vaultTotalOutstandingDebt,
             borrowRatePerSecondInEther,
             elapsedSeconds
         );
 
         // Update the vault states based on the interest amount:
-        // totalOutstandingDebt & totalVaultPendingFees
+        // vaultTotalOutstandingDebt & vaultTotalPendingFees
         setVaultStates(interestAmount, currentTimestamp);
 
         // Emit the event
         emit InterestAccrued(
             previousTimestamp,
             currentTimestamp,
-            previousTotalOutstandingDebt,
-            previoustotalVaultPendingFees,
+            previousVaultTotalOutstandingDebt,
+            previousVaultTotalPendingFees,
             borrowRatePerSecondInEther,
             elapsedSeconds,
             interestAmount,
-            totalOutstandingDebt,
-            totalVaultPendingFees
+            vaultTotalOutstandingDebt,
+            vaultTotalPendingFees
         );
     }
 
     /**
      * @notice getExchangeRateInEther get the current exchange rate of vault token
-     *         in term of Vault's underlying asset.
+     *         in term of Vault's underlying token.
      * @return The exchange rates in ether units
      */
     function getExchangeRateInEther() public view returns (uint256) {
@@ -451,7 +457,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             // Otherwise: exchangeRate = (totalAvailable + totalOutstandingDebt) / totalSupply
             uint256 totalAvailable = getTotalAvailableCash();
             uint256 totalAllUnderlyingAsset = totalAvailable +
-                totalOutstandingDebt;
+                vaultTotalOutstandingDebt;
             uint256 exchangeRateInEther = (totalAllUnderlyingAsset * 1 ether) /
                 totalSupply;
             return exchangeRateInEther;
@@ -459,19 +465,23 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Lender supplies underlying assets into the vault and receives
+     * @notice Lender supplies underlying token into the vault and receives
      *         vault tokens in exchange
-     * @param amount The amount of the underlying asset to supply
+     * @param amount The amount of the underlying token to supply
      */
-    function mint(uint256 amount) external nonReentrant {
+    function addSupply(uint256 amount) external nonReentrant {
         // Accrue interest
         accrueInterest();
 
+        // Transfer asset from lender to the vault
+        IERC20(vaultUnderlyingTokenAddress).safeTransferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
+
         // Get the exchange rate
         uint256 exchangeRateInEther = getExchangeRateInEther();
-
-        // Transfer asset from lender to the vault
-        IERC20(supply).safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate how much vault token we need to send to the lender
         uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther;
@@ -480,31 +490,39 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         _mint(msg.sender, mintedAmount);
 
         // Emit event
-        emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
+        emit VaultSupplyAdded(
+            msg.sender,
+            amount,
+            exchangeRateInEther,
+            mintedAmount
+        );
     }
 
     /**
      * @notice Lender burn vault tokens and receives underlying tokens in exchange
      * @param amount The amount of the vault tokens
      */
-    function burn(uint256 amount) external nonReentrant {
+    function removeSupply(uint256 amount) external nonReentrant {
         // Accrue interest
         accrueInterest();
-
-        // Get the exchange rate
-        uint256 exchangeRateInEther = getExchangeRateInEther();
 
         // Burn the vault tokens from the lender
         _burn(msg.sender, amount);
 
+        // Get the exchange rate
+        uint256 exchangeRateInEther = getExchangeRateInEther();
+
         // Calculate how much underlying token we need to send to the lender
         uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether;
 
-        // Transfer Vault's underlying asset from the vault to the lender
-        IERC20(supply).safeTransfer(msg.sender, redeemedAmount);
+        // Transfer Vault's underlying token from the vault to the lender
+        IERC20(vaultUnderlyingTokenAddress).safeTransfer(
+            msg.sender,
+            redeemedAmount
+        );
 
         // Emit event
-        emit SupplyRemoved(
+        emit VaultSupplyRemoved(
             msg.sender,
             amount,
             exchangeRateInEther,
@@ -514,7 +532,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice getDebtProportionRateInEther returns the proportion of borrow
-     *         amount relative to the totalOutstandingDebt
+     *         amount relative to the vaultTotalOutstandingDebt
      * @return debtProportionRateInEther The debt proportion rate in ether units
      */
     function getDebtProportionRateInEther()
@@ -522,28 +540,28 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         view
         returns (uint256 debtProportionRateInEther)
     {
-        if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
+        if (vaultTotalOutstandingDebt == 0 || vaultTotalDebtProportion == 0) {
             return 1 ether;
         }
         debtProportionRateInEther =
-            (totalOutstandingDebt * 1 ether) /
-            totalDebtProportion;
+            (vaultTotalOutstandingDebt * 1 ether) /
+            vaultTotalDebtProportion;
     }
 
     /**
      * @notice getOutstandingDebt returns the debt owed by the ETF
-     * @param account The ETF address
+     * @param etf The ETF address
      */
-    function getOutstandingDebt(address account) public view returns (uint256) {
+    function getOutstandingDebt(address etf) public view returns (uint256) {
         // If there is no debt, return 0
-        if (totalOutstandingDebt == 0) {
+        if (vaultTotalOutstandingDebt == 0) {
             return 0;
         }
 
         // Calculate the outstanding debt
         // outstanding debt = debtProportion * debtProportionRate
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        uint256 a = (debtProportion[account] * debtProportionRateInEther);
+        uint256 a = (vaultDebtProportion[etf] * debtProportionRateInEther);
         uint256 b = 1 ether;
         uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
 
@@ -552,26 +570,28 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice getVaultParameters returns the current vault parameters.
-     * @return All vault parameters
+     * @return optimalUtilizationRateInEther Optimal utilization rate in ether units.
+     * @return interestSlope1InEther Interest slope #1 in ether units.
+     * @return interestSlope2InEther Interest slope #2 in ether units.
+     * @return maxBorrowRatePerSecondInEther Maximum borrow rate per second in ether units.
+     * @return performanceFeeInEther Performance fee in ether units.
      */
     function getVaultParameters()
         external
         view
         returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
+            uint256 optimalUtilizationRateInEther,
+            uint256 interestSlope1InEther,
+            uint256 interestSlope2InEther,
+            uint256 maxBorrowRatePerSecondInEther,
+            uint256 performanceFeeInEther
         )
     {
-        return (
-            OPTIMAL_UTILIZATION_RATE_IN_ETHER,
-            INTEREST_SLOPE_1_IN_ETHER,
-            INTEREST_SLOPE_2_IN_ETHER,
-            MAX_BORROW_RATE_PER_SECOND_IN_ETHER,
-            PERFORMANCE_FEE_IN_ETHER
-        );
+        optimalUtilizationRateInEther = VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER;
+        interestSlope1InEther = VAULT_INTEREST_SLOPE_1_IN_ETHER;
+        interestSlope2InEther = VAULT_INTEREST_SLOPE_2_IN_ETHER;
+        maxBorrowRatePerSecondInEther = VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER;
+        performanceFeeInEther = VAULT_PERFORMANCE_FEE_IN_ETHER;
     }
 
     /**
@@ -591,31 +611,36 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         uint256 fee
     ) external onlyOwner {
         // Update vault parameters
-        OPTIMAL_UTILIZATION_RATE_IN_ETHER = u;
-        INTEREST_SLOPE_1_IN_ETHER = s1;
-        INTEREST_SLOPE_2_IN_ETHER = s2;
-        MAX_BORROW_RATE_PER_SECOND_IN_ETHER = mr;
-        PERFORMANCE_FEE_IN_ETHER = fee;
+        VAULT_OPTIMAL_UTILIZATION_RATE_IN_ETHER = u;
+        VAULT_INTEREST_SLOPE_1_IN_ETHER = s1;
+        VAULT_INTEREST_SLOPE_2_IN_ETHER = s2;
+        VAULT_MAX_BORROW_RATE_PER_SECOND_IN_ETHER = mr;
+        VAULT_PERFORMANCE_FEE_IN_ETHER = fee;
 
         emit VaultParametersUpdated(msg.sender, u, s1, s2, mr, fee);
     }
 
     /**
-     * @notice collectPendingFees withdraws collected fees to the feeRecipient address
+     * @notice collectPendingFees withdraws collected fees to the feeRecipient
+     *         address
      * @dev Anyone can call this function
+     * TODO (bayu): Implement collectPendingFees(etf)
      */
     function collectPendingFees() external nonReentrant {
         // Accrue interest
         accrueInterest();
 
         // For logging purpose
-        uint256 collectedFees = totalVaultPendingFees;
+        uint256 collectedFees = vaultTotalPendingFees;
 
-        // Transfer Vault's underlying asset from the vault to the fee recipient
-        IERC20(supply).safeTransfer(feeRecipient, collectedFees);
+        // Transfer Vault's underlying token from the vault to the fee recipient
+        IERC20(vaultUnderlyingTokenAddress).safeTransfer(
+            feeRecipient,
+            collectedFees
+        );
 
-        // Reset the totalVaultPendingFees
-        totalVaultPendingFees = 0;
+        // Reset the vaultTotalPendingFees
+        vaultTotalPendingFees = 0;
 
         emit FeeCollected(msg.sender, collectedFees, feeRecipient);
     }
@@ -628,6 +653,18 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         feeRecipient = account;
 
         emit FeeRecipientUpdated(msg.sender, account);
+    }
+
+    /**
+     * @notice getFeeRecipient returns the fee recipient address.
+     * @return recipientAddress The address of the fee recipient.
+     */
+    function getFeeRecipient()
+        external
+        view
+        returns (address recipientAddress)
+    {
+        recipientAddress = feeRecipient;
     }
 
     /**
@@ -665,6 +702,9 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Map new info to their token
         etfs[token] = info;
+
+        // Emit event
+        emit ETFCreated(msg.sender, token);
     }
 
     /**
@@ -717,11 +757,12 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice getCollateralPrice returns the latest price of the collateral in term of
-     *         Vault's underlying asset (e.g ETH most like trading around 3000 UDSC or 3000*1e6)
+     *         Vault's underlying token (e.g ETH most likely trading around 3000 UDSC or 3000*1e6)
      * @param collateralFeed The Chainlink collateral feed against USD (e.g. ETH/USD)
-     * @return collateralPrice Price of collateral in term of Vault's underlying asset
+     * @param supplyFeed The Chainlink vault's underlying token feed against USD (e.g. USDC/USD)
+     * @return collateralPrice Price of collateral in term of Vault's underlying token
      */
-    function getCollateralPrice(address collateralFeed)
+    function getCollateralPrice(address collateralFeed, address supplyFeed)
         internal
         view
         returns (uint256 collateralPrice)
@@ -732,7 +773,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
             supplyPriceInGwei;
 
         // Convert gwei to supply decimals
-        collateralPrice = (priceInGwei * (10**_decimals)) / 1 gwei;
+        collateralPrice = (priceInGwei * (10**vaultTokenDecimals)) / 1 gwei;
     }
 
     /**
@@ -740,7 +781,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      * @param tokenIn The token that we need to transfer to Uniswap V3
      * @param tokenOut The token that we want to get from the Uniswap V3
      * @param amountOut The amount of tokenOut that we need to buy
-     * @param amountInMaximum The maximum of token in that we want to pay to get amountOut
+     * @param amountInMaximum The maximum of tokenIn that we want to pay to get amountOut
      * @param poolFee The uniswap pool fee: [10000, 3000, 500]
      * @return amountIn The amount tokenIn that we send to Uniswap V3 to get amountOut
      */
@@ -848,17 +889,20 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice getETFNAV gets the ETF net-asset value
-     * @dev This is used for front end
+     * @dev This function is mainly used for the interface (front-end)
      * @param etf The ETF token address
-     * @return etfNAV The NAV price of the ETF in term of vault underlying asset (e.g. 50 USDC is 50*1e6)
+     * @return etfNAV The NAV price of the ETF in term of vault's underlying token (e.g. 50 USDC is 50*1e6)
      */
     function getETFNAV(address etf) public view returns (uint256 etfNAV) {
         ETFInfo memory etfInfo = etfs[etf];
         if (etfInfo.feeInEther == 0) return 0;
 
-        // Get the current price of ETF underlying asset (collateral)
-        // in term of vault underlying asset (supply) (e.g. ETH/USDC)
-        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+        // Get the current price of ETF underlying token (collateral)
+        // in term of vault underlying token (supply) (e.g. ETH/USDC)
+        uint256 collateralPrice = getCollateralPrice(
+            etfInfo.feed,
+            vaultUnderlyingTokenFeedAddress
+        );
 
         // Get collateral per etf and debt per etf
         uint256 etfTotalSupply = IERC20(etfInfo.token).totalSupply();
@@ -890,11 +934,11 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      */
     function setETFBorrowStates(address etf, uint256 borrowAmount) internal {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        totalOutstandingDebt += borrowAmount;
+        vaultTotalOutstandingDebt += borrowAmount;
         uint256 borrowProportion = (borrowAmount * 1 ether) /
             debtProportionRateInEther;
-        totalDebtProportion += borrowProportion;
-        debtProportion[etf] = debtProportion[etf] + borrowProportion;
+        vaultTotalDebtProportion += borrowProportion;
+        vaultDebtProportion[etf] = vaultDebtProportion[etf] + borrowProportion;
     }
 
     /**
@@ -949,7 +993,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Buy more collateral from Uniswap V3
         borrowAmount = swapExactOutputSingle(
-            supply,
+            vaultUnderlyingTokenAddress,
             etfInfo.collateral,
             collateralAmount,
             maxSupplyOut,
@@ -989,7 +1033,10 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
 
         // Get the current price of ETF underlying asset (collateral)
         // in term of vault underlying asset (supply) (e.g. ETH/USDC)
-        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+        uint256 collateralPrice = getCollateralPrice(
+            etfInfo.feed,
+            vaultUnderlyingTokenFeedAddress
+        );
 
         // Get the borrow amount
         uint256 borrowAmount = borrowAndSwap(
@@ -1021,15 +1068,19 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
      */
     function setETFRepayStates(address etf, uint256 repayAmount) internal {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        totalOutstandingDebt -= repayAmount;
+        vaultTotalOutstandingDebt -= repayAmount;
         uint256 repayProportion = (repayAmount * 1 ether) /
             debtProportionRateInEther;
-        totalDebtProportion -= repayProportion;
-        debtProportion[etf] -= repayProportion;
+        vaultTotalDebtProportion -= repayProportion;
+        vaultDebtProportion[etf] -= repayProportion;
     }
 
     /**
-     * @notice getRepay amount
+     * @notice getRepayAmount get the amount need to be repayed to the vault
+     * @param etfInfo The ETF Info
+     * @param totalSupply The total supply of the ETF token
+     * @param amount The ETF token amount
+     * @return repayAmount The amount of vault's underlying token that need to be repay
      */
     function getRepayAmount(
         ETFInfo memory etfInfo,
@@ -1046,13 +1097,14 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Redeem ETF token to get the collateral back
+     * @notice redeem Burn the ETF token then send the ETF's collateral token to the sender.
      * @param etf The address of the ETF token
-     * @param amount The mount of ETF token need to be burned
+     * @param amount The amount of ETF token need to be burned
      */
     function redeem(address etf, uint256 amount) external nonReentrant {
         // Accrue interest
         accrueInterest();
+
         // Get the ETF info
         ETFInfo memory etfInfo = etfs[etf];
         require(etfInfo.feeInEther > 0, "!ETF"); // Make sure the ETF is exists
@@ -1076,7 +1128,10 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         setETFRepayStates(etf, repayAmount);
 
         // Get the collateral price
-        uint256 collateralPrice = getCollateralPrice(etfInfo.feed);
+        uint256 collateralPrice = getCollateralPrice(
+            etfInfo.feed,
+            vaultUnderlyingTokenFeedAddress
+        );
         // Maximum minus -1% from the chainlink oracle
         uint256 minimumCollateralPrice = collateralPrice -
             ((0.01 ether * collateralPrice) / 1 ether);
@@ -1096,7 +1151,7 @@ contract Risedle is ERC20, Ownable, ReentrancyGuard {
         // Sell the collateral to repay the asset
         uint256 collateralSold = swapExactOutputSingle(
             etfInfo.collateral,
-            supply,
+            vaultUnderlyingTokenAddress,
             repayAmount,
             collateralRepay,
             etfInfo.uniswapV3PoolFee

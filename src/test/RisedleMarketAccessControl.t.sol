@@ -16,22 +16,22 @@ import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/
 import {USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, UNISWAPV3_SWAP_ROUTER} from "chain/Constants.sol";
 
 import {Hevm} from "./Hevm.sol";
-import {Risedle} from "../Risedle.sol";
+import {RisedleMarket} from "../RisedleMarket.sol";
 
 /// @notice Dummy contract to simulate random account to execute collect fee
 contract FeeCollector {
-    Risedle _vault;
+    RisedleMarket market;
 
-    constructor(Risedle vault) {
-        _vault = vault;
+    constructor(RisedleMarket market_) {
+        market = market_;
     }
 
     function collectPendingFees() public {
-        _vault.collectPendingFees();
+        market.collectPendingFees();
     }
 }
 
-contract RisedleAccessControlTest is DSTest {
+contract RisedleMarketAccessControlTest is DSTest {
     // Test utils
     IERC20 constant USDC = IERC20(USDC_ADDRESS);
     Hevm hevm;
@@ -41,10 +41,10 @@ contract RisedleAccessControlTest is DSTest {
         hevm = new Hevm();
     }
 
-    /// @notice Utility function to create new vault
-    function createNewVault() internal returns (Risedle) {
-        // Create new vault
-        Risedle vault = new Risedle(
+    /// @notice Utility function to create new Risedle Market
+    function createNewMarket() internal returns (RisedleMarket) {
+        // Create new market
+        RisedleMarket market = new RisedleMarket(
             "Risedle USDC Vault",
             "rvUSDC",
             USDC_ADDRESS,
@@ -52,26 +52,26 @@ contract RisedleAccessControlTest is DSTest {
             6,
             UNISWAPV3_SWAP_ROUTER
         );
-        return vault;
+        return market;
     }
 
     /// @notice Make sure the governance is properly set
     function test_GovernanceIsProperlySet() public {
-        // Create new vault
-        Risedle vault = createNewVault();
+        // Create new market
+        RisedleMarket market = createNewMarket();
 
         // The governance is the one who create/deploy the vault
-        assertEq(vault.owner(), address(this));
+        assertEq(market.owner(), address(this));
     }
 
     /// @notice Make sure non-governance account cannot set vault parameters
     function testFail_NonGovernanceCannotSetVaultParameters() public {
         address governance = hevm.addr(2); // Use random address as governance
-        Risedle vault = createNewVault();
-        vault.transferOwnership(governance);
+        RisedleMarket market = createNewMarket();
+        market.transferOwnership(governance);
 
         // Make sure this is fail
-        vault.setVaultParameters(
+        market.setVaultParameters(
             0.1 ether,
             0.2 ether,
             0.3 ether,
@@ -83,7 +83,7 @@ contract RisedleAccessControlTest is DSTest {
     /// @notice Make sure governance can update the vault parameters
     function test_GovernanceCanSetVaultParameters() public {
         // This contract is the governance by default
-        Risedle vault = createNewVault();
+        RisedleMarket market = createNewMarket();
 
         // Update vault's parameters
         uint256 optimalUtilizationRate = 0.8 ether;
@@ -91,7 +91,7 @@ contract RisedleAccessControlTest is DSTest {
         uint256 slope2 = 0.9 ether;
         uint256 maxBorrowRatePerSeconds = 0.7 ether;
         uint256 fee = 0.9 ether;
-        vault.setVaultParameters(
+        market.setVaultParameters(
             optimalUtilizationRate,
             slope1,
             slope2,
@@ -100,7 +100,7 @@ contract RisedleAccessControlTest is DSTest {
         );
 
         // Make sure the parameters is updated
-        (uint256 u, uint256 s1, uint256 s2, uint256 mr, uint256 f) = vault
+        (uint256 u, uint256 s1, uint256 s2, uint256 mr, uint256 f) = market
             .getVaultParameters();
 
         assertEq(u, optimalUtilizationRate);
@@ -114,42 +114,41 @@ contract RisedleAccessControlTest is DSTest {
     function testFail_NonGovernanceCannotSetFeeRecipientAddress() public {
         // Set governance
         address governance = hevm.addr(2);
-        Risedle vault = createNewVault();
-        vault.transferOwnership(governance);
+        RisedleMarket market = createNewMarket();
+        market.transferOwnership(governance);
 
         // Make sure it fails
-        vault.setFeeRecipient(hevm.addr(3));
+        market.setFeeRecipient(hevm.addr(3));
     }
 
     /// @notice Make sure governance can update the fee recipient
     function test_GovernanceCanSetFeeRecipientAddress() public {
         // Set the new fee recipient
-        address newReceiver = hevm.addr(2);
+        address newFeeRecipient = hevm.addr(2);
 
-        // Create new vault
-        Risedle vault = createNewVault();
+        // Create new market
+        RisedleMarket market = createNewMarket();
 
         // Update the fee recipient
-        vault.setFeeRecipient(newReceiver);
+        market.setFeeRecipient(newFeeRecipient);
 
-        // If we are then the operation is succeed
-        // Need to make sure via other external test tho
-        assertTrue(true);
+        // Make sure the fee recipient is updated
+        assertEq(market.getFeeRecipient(), newFeeRecipient);
     }
 
     /// @notice Test accrue interest as public
     function test_AnyoneCanAccrueInterest() public {
-        // Create new vault
+        // Create new market
         address governance = hevm.addr(2);
-        Risedle vault = createNewVault();
-        vault.transferOwnership(governance);
+        RisedleMarket market = createNewMarket();
+        market.transferOwnership(governance);
 
         // Set the timestamp
         uint256 previousTimestamp = block.timestamp;
         hevm.warp(previousTimestamp);
 
         // Public accrue interest
-        vault.accrueInterest();
+        market.accrueInterest();
 
         // Make sure is not failed
         assertTrue(true);
@@ -157,13 +156,13 @@ contract RisedleAccessControlTest is DSTest {
 
     /// @notice Only governance can create new ETF
     function testFail_NonGovernanceCannotCreateNewETF() public {
-        // Create new vault
+        // Create new market
         address governance = hevm.addr(2);
-        Risedle vault = createNewVault();
-        vault.transferOwnership(governance);
+        RisedleMarket market = createNewMarket();
+        market.transferOwnership(governance);
 
         // Make sure this action is failed
-        vault.createNewETF(
+        market.createNewETF(
             hevm.addr(2),
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
@@ -175,14 +174,14 @@ contract RisedleAccessControlTest is DSTest {
 
     /// @notice Governance can create new ETF
     function test_GovernanceCanCreateNewETF() public {
-        // Create new vault as governance
-        Risedle vault = createNewVault();
+        // Create new market as governance
+        RisedleMarket market = createNewMarket();
 
         // Create new ETF as governance
         uint256 initialPrice = 100 * 1e6; // 100 USDC
         address etfToken = hevm.addr(1); // Set random address
         uint256 feeInEther = 0.001 ether; // 0.1% creation and redemption fee
-        vault.createNewETF(
+        market.createNewETF(
             etfToken,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
@@ -192,7 +191,7 @@ contract RisedleAccessControlTest is DSTest {
         );
 
         // Get the ETF info
-        Risedle.ETFInfo memory etfInfo = vault.getETFInfo(etfToken);
+        RisedleMarket.ETFInfo memory etfInfo = market.getETFInfo(etfToken);
 
         // Make sure the etfInfo is correct
         assertEq(etfInfo.token, etfToken);
