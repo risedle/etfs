@@ -12,27 +12,38 @@ pragma solidity ^0.8.7;
 pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract RisedleFaucetToken is ERC20 {
-    uint8 private _decimals;
+contract RisedleFaucetToken is ERC20, Ownable {
+    uint8 private faucetTokenDecimals;
+    uint256 private faucetMaxAmount;
+    mapping(address => bool) isMinted;
 
     constructor(
         string memory name,
         string memory symbol,
-        uint8 decimals_
+        uint8 tokenDecimals,
+        uint256 faucetAmount
     ) ERC20(name, symbol) {
-        _decimals = decimals_;
+        faucetTokenDecimals = tokenDecimals;
+        faucetMaxAmount = faucetAmount;
     }
 
     function decimals() public view virtual override returns (uint8) {
-        return _decimals;
+        return faucetTokenDecimals;
     }
 
-    function mint(uint256 amount) external {
+    function mint(uint256 amount) external onlyOwner {
         _mint(msg.sender, amount);
     }
 
-    function burn(uint256 amount) external {
+    function burn(uint256 amount) external onlyOwner {
         _burn(msg.sender, amount);
+    }
+
+    function mint() external {
+        require(isMinted[msg.sender] == false, "!max");
+        _mint(msg.sender, faucetMaxAmount);
+        isMinted[msg.sender] = true;
     }
 }
