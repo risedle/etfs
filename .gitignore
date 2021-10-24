@@ -6,3 +6,4 @@ hevm.libs*
 # Ignore secret files
 .dapprc
 
+scripts/deploy-*
