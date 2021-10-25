@@ -15,10 +15,10 @@ The frontend is available [here](https://github.com/risedle/frontend).
 
 The smart contract is available on Kovan:
 
-- Risedle Market [0xf0A7C769ed7F8aF25cC282f9C56554e8A79036cf](https://kovan.etherscan.io/address/0xf0A7C769ed7F8aF25cC282f9C56554e8A79036cf)
-- ETHRISE [0xf5DfA11102a7Fe490b25D58bdcB3C769f7fD5BF7](https://kovan.etherscan.io/address/0xf5DfA11102a7Fe490b25D58bdcB3C769f7fD5BF7)
-- Risedle USDC Faucet [0x8b07CD71F5C4329F309Fc3330D3308a076a347da](https://kovan.etherscan.io/address/0x8b07CD71F5C4329F309Fc3330D3308a076a347da)
-- Risedle WETH Faucet [0xA264114C65e26a864153314FBC1b3F49Bf29123d](https://kovan.etherscan.io/address/0xA264114C65e26a864153314FBC1b3F49Bf29123d)
+- Risedle Market [0x58ecc53FFCE4ddD88B5e94F10b37844d9D7c9b1B](https://kovan.etherscan.io/address/0x58ecc53FFCE4ddD88B5e94F10b37844d9D7c9b1B)
+- ETHRISE [0xA6eA51038FD62DC8a9F0FB0B7C41A10c9F62A56b](https://kovan.etherscan.io/address/0xA6eA51038FD62DC8a9F0FB0B7C41A10c9F62A56b)
+- Risedle USDC Faucet [0x0Af08696CB51e81456DC0a1dee7F8BfAD8d82a22](https://kovan.etherscan.io/address/0x0Af08696CB51e81456DC0a1dee7F8BfAD8d82a22)
+- Risedle WETH Faucet [0x1673801682F5EAE287Bb7081Cf7d0D1d768E661a](https://kovan.etherscan.io/address/0x1673801682F5EAE287Bb7081Cf7d0D1d768E661a)
 
 ## Install
 
