@@ -1,5 +1,5 @@
 # Set solidity version
-export DAPP_SOLC_VERSION=0.8.7
+export DAPP_SOLC_VERSION=0.8.9
 
 # To surpress $(dapp remappings) error
 export DAPP_REMAPPINGS=""
