@@ -13,7 +13,7 @@
 // File to find the slot location:
 // https://gist.github.com/pyk/1fdb426e722dc711cc6ee6fc60e0563f
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 address constant USDC_ADDRESS = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8;

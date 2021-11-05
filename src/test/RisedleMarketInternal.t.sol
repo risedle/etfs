@@ -3,7 +3,7 @@
 // Risedle's Market Internal Test
 // Test & validate all internal functionalities
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";

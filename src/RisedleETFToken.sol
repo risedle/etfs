@@ -8,7 +8,7 @@
 // Copyright (c) 2021 Bayu - All rights reserved
 // github: pyk
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
