@@ -11,6 +11,20 @@ import "lib/ds-test/src/test.sol";
 import {RisedleMarket} from "../RisedleMarket.sol";
 import {Hevm} from "./Hevm.sol";
 import {USDC_ADDRESS, CHAINLINK_USDC_USD} from "chain/Constants.sol";
+import {IRisedleERC20} from "../tokens/RisedleERC20.sol";
+
+/// @notice To simulate actions performed by other accounts
+contract RisedleNonMarket {
+    address private _vaultToken;
+
+    constructor(address vaultToken) {
+        _vaultToken = vaultToken;
+    }
+
+    function mint(address to, uint256 amount) external {
+        IRisedleERC20(_vaultToken).mint(to, amount);
+    }
+}
 
 contract RisedleMarketAccessControl is DSTest {
     Hevm hevm;
@@ -80,4 +94,35 @@ contract RisedleMarketAccessControl is DSTest {
         assertEq(vaultMetadata.feeRecipient, feeRecipient);
         assertEq(vaultMetadata.implementation, vaultImplementation);
     }
+
+    /// @notice Make sure only the market can mint the vault token
+    function testFail_NonMarketCannotMintVaultToken() public {
+        // Create new market; by default the deployer is the owner
+        RisedleMarket market = new RisedleMarket();
+
+        // Vault's fee recipient
+        address feeRecipient = hevm.addr(1);
+
+        // Vault's implementation
+        address vaultImplementation = hevm.addr(2);
+
+        // Create new vault
+        address vaultTokenAddress = market.createNewVault(
+            "Risedle USDC Vault",
+            "rvUSDC",
+            USDC_ADDRESS,
+            CHAINLINK_USDC_USD,
+            feeRecipient,
+            vaultImplementation
+        );
+
+        // Create new non-market actor
+        RisedleNonMarket nonMarket = new RisedleNonMarket(vaultTokenAddress);
+
+        // Non market trying to mint the vault token; it should be failed
+        address to = hevm.addr(3);
+        nonMarket.mint(to, 1 ether);
+    }
+
+    /// TODO: implement testFail_NonMarketCannotBurnVaultToken
 }
