@@ -8,11 +8,11 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
-import {RisedleVault} from "../../vaults/RisedleVault.sol";
+import {RisedleVault} from "../RisedleVault.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Hevm} from "../Hevm.sol";
+import {Hevm} from "./Hevm.sol";
 
 import {USDC_ADDRESS} from "chain/Constants.sol";
 
