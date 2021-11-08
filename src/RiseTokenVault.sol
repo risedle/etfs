@@ -98,4 +98,17 @@ contract RiseTokenVault is RisedleVault {
 
         return riseTokenAddress;
     }
+
+    /**
+     * @notice getMetadata returns the metadata of the RISE token
+     * @param token The address of the RISE token
+     * @return The metadata of the RISE token
+     */
+    function getMetadata(address token)
+        external
+        view
+        returns (RiseTokenMetadata memory)
+    {
+        return riseTokens[token];
+    }
 }
