@@ -138,6 +138,10 @@ contract RisedleVaultExternalTest is DSTest {
         // Lender remove supply from the vault
         lender.withdraw(amount);
 
+        // The vault's token should be burned
+        assertEq(IERC20(address(vault)).totalSupply(), 0);
+        assertEq(IERC20(address(vault)).balanceOf(address(lender)), 0);
+
         // Because the exchange rate is 1:1 lender should receive all
         // the USDC back
         assertEq(IERC20(USDC_ADDRESS).balanceOf(address(lender)), amount);
