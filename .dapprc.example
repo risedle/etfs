@@ -4,6 +4,9 @@ export DAPP_SOLC_VERSION=0.8.9
 # To surpress $(dapp remappings) error
 export DAPP_REMAPPINGS=""
 
+# Activate the optimizer
+export DAPP_BUILD_OPTIMIZE=1
+
 if [ "$CHAIN" == "ethereum" ]
 then
   export ETH_RPC_URL=
