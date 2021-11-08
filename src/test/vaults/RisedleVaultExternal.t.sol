@@ -38,6 +38,18 @@ contract Lender {
         // Reset approval to zero
         IERC20(_vault.getUnderlying()).safeApprove(address(_vault), 0);
     }
+
+    /// @notice lender remove asset
+    function withdraw(uint256 amount) public {
+        // Approve the vault to spend the vault token
+        IERC20(address(_vault)).safeApprove(address(_vault), amount);
+
+        // Supply asset
+        _vault.removeSupply(amount);
+
+        // Reset approval to zero
+        IERC20(address(_vault)).safeApprove(address(_vault), 0);
+    }
 }
 
 /**
@@ -69,7 +81,7 @@ contract RisedleVaultExternalTest is DSTest {
     }
 
     /// @notice Make sure anyone can supply asset to the vault
-    function test_AnyoneCanAddSupplytToTheVault() public {
+    function test_AnyoneCanAddSupplyToTheVault() public {
         // Create new vault
         RisedleVault vault = createNewVault();
 
@@ -82,6 +94,9 @@ contract RisedleVaultExternalTest is DSTest {
 
         // Lender add supply to the vault
         lender.lend(amount);
+
+        // Set timestamp to next 5 days
+        hevm.warp(block.timestamp + (60 * 24 * 5));
 
         // Lender should receive the same amount of vault token
         // Because the initial exchange rate is 1:1
@@ -97,6 +112,45 @@ contract RisedleVaultExternalTest is DSTest {
 
         // The total available cash should be equal to amount
         assertEq(vault.getTotalAvailableCash(), amount);
+
+        // The exchange rate should be 1:1
+        assertEq(vault.getExchangeRateInEther(), 1 ether);
+    }
+
+    /// @notice Make sure anyone can remove asset from the vault
+    function test_AnyoneCanRemoveSupplyFromTheVault() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDC balance
+        uint256 amount = 1000 * 1e6; // 1000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
+
+        // Lender add supply to the vault
+        lender.lend(amount);
+
+        // Set timestamp to next 5 days
+        hevm.warp(block.timestamp + (60 * 24 * 5));
+
+        // Lender remove supply from the vault
+        lender.withdraw(amount);
+
+        // Because the exchange rate is 1:1 lender should receive all
+        // the USDC back
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(lender)), amount);
+
+        // The vault should have zero USDC
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(vault)), 0);
+
+        // The vault borrow rate and supply rate should be zero
+        assertEq(vault.getBorrowRatePerSecondInEther(), 0);
+        assertEq(vault.getSupplyRatePerSecondInEther(), 0);
+
+        // The total available cash should be equal to zero
+        assertEq(vault.getTotalAvailableCash(), 0);
 
         // The exchange rate should be 1:1
         assertEq(vault.getExchangeRateInEther(), 1 ether);

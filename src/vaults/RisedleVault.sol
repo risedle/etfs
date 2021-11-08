@@ -417,4 +417,33 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         // Emit event
         emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
     }
+
+    /**
+     * @notice Lender burn vault tokens and receives underlying tokens in exchange
+     * @param amount The amount of the vault tokens
+     */
+    function removeSupply(uint256 amount) external nonReentrant {
+        // Accrue interest
+        accrueInterest();
+
+        // Burn the vault tokens from the lender
+        _burn(msg.sender, amount);
+
+        // Get the exchange rate
+        uint256 exchangeRateInEther = getExchangeRateInEther();
+
+        // Calculate how much underlying token we need to send to the lender
+        uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether;
+
+        // Transfer Vault's underlying token from the vault to the lender
+        IERC20(underlyingToken).safeTransfer(msg.sender, redeemedAmount);
+
+        // Emit event
+        emit SupplyRemoved(
+            msg.sender,
+            amount,
+            exchangeRateInEther,
+            redeemedAmount
+        );
+    }
 }
