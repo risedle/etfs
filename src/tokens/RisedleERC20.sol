@@ -12,8 +12,8 @@
 pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
-import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import { Ownable } from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 interface IRisedleERC20 {
     function mint(address to, uint256 amount) external;

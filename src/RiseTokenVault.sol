@@ -9,10 +9,10 @@
 pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
-import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {RisedleVault} from "./RisedleVault.sol";
-import {RisedleERC20} from "./tokens/RisedleERC20.sol";
+import { RisedleVault } from "./RisedleVault.sol";
+import { RisedleERC20 } from "./tokens/RisedleERC20.sol";
 
 contract RiseTokenVault is RisedleVault {
     /// @notice RiseTokenMetadata contains the metadata of RISE token
@@ -79,16 +79,7 @@ contract RiseTokenVault is RisedleVault {
 
         // Create new Rise metadata
         address riseTokenAddress = address(riseToken);
-        RiseTokenMetadata memory riseTokenMetadata = RiseTokenMetadata(
-            riseTokenAddress,
-            collateral,
-            feed,
-            swap,
-            initialPrice,
-            feeInEther,
-            0,
-            0
-        );
+        RiseTokenMetadata memory riseTokenMetadata = RiseTokenMetadata(riseTokenAddress, collateral, feed, swap, initialPrice, feeInEther, 0, 0);
 
         // Map new info to their token
         riseTokens[riseTokenAddress] = riseTokenMetadata;
@@ -104,11 +95,17 @@ contract RiseTokenVault is RisedleVault {
      * @param token The address of the RISE token
      * @return The metadata of the RISE token
      */
-    function getMetadata(address token)
-        external
-        view
-        returns (RiseTokenMetadata memory)
-    {
+    function getMetadata(address token) external view returns (RiseTokenMetadata memory) {
         return riseTokens[token];
+    }
+
+    /**
+     * @notice Mint new RISE token
+     * @param token The address of RISE token
+     * @param amount The collateral amount
+     */
+    function mint(address token, uint256 amount) external nonReentrant {
+        // Accrue interest
+        accrueInterest();
     }
 }

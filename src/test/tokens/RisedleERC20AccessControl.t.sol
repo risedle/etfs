@@ -7,8 +7,8 @@ pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
-import {Hevm} from "../Hevm.sol";
-import {RisedleERC20} from "../../tokens/RisedleERC20.sol";
+import { Hevm } from "../Hevm.sol";
+import { RisedleERC20 } from "../../tokens/RisedleERC20.sol";
 
 contract RisedleERC20AccessControl is DSTest {
     Hevm hevm;
@@ -25,12 +25,7 @@ contract RisedleERC20AccessControl is DSTest {
         uint8 decimals = 18; // Similar to WETH
 
         // Create new ETF token
-        RisedleERC20 token = new RisedleERC20(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            owner,
-            decimals
-        );
+        RisedleERC20 token = new RisedleERC20("ETH 2x Leverage Risedle", "ETHRISE", owner, decimals);
 
         // Non owner trying to mint token
         // This should be failed
@@ -44,12 +39,7 @@ contract RisedleERC20AccessControl is DSTest {
         uint8 decimals = 18; // Similar to WETH
 
         // Create new ETF token
-        RisedleERC20 token = new RisedleERC20(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            owner,
-            decimals
-        );
+        RisedleERC20 token = new RisedleERC20("ETH 2x Leverage Risedle", "ETHRISE", owner, decimals);
 
         // Mint new token as owner
         address recipient = hevm.addr(1);
@@ -67,12 +57,7 @@ contract RisedleERC20AccessControl is DSTest {
         uint8 decimals = 18; // Similar to WETH
 
         // Create new ETF token
-        RisedleERC20 token = new RisedleERC20(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            owner,
-            decimals
-        );
+        RisedleERC20 token = new RisedleERC20("ETH 2x Leverage Risedle", "ETHRISE", owner, decimals);
 
         // Mint new token as owner
         address recipient = hevm.addr(1);
@@ -95,12 +80,7 @@ contract RisedleERC20AccessControl is DSTest {
         uint8 decimals = 18; // Similar to WETH
 
         // Create new ETF token
-        RisedleERC20 token = new RisedleERC20(
-            "ETH 2x Leverage Risedle",
-            "ETHRISE",
-            owner,
-            decimals
-        );
+        RisedleERC20 token = new RisedleERC20("ETH 2x Leverage Risedle", "ETHRISE", owner, decimals);
 
         // Mint new token as owner
         address recipient = hevm.addr(1);

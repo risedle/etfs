@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
-import {USDC_ADDRESS, USDC_SLOT, USDT_ADDRESS, USDT_SLOT, WETH_ADDRESS, WETH_SLOT} from "chain/Constants.sol";
+import { USDC_ADDRESS, USDC_SLOT, USDT_ADDRESS, USDT_SLOT, WETH_ADDRESS, WETH_SLOT } from "chain/Constants.sol";
 
 /// @notice Set Hevm interface, so we can use the cheat codes it in the test
 /// @dev https://github.com/dapphub/dapptools/tree/master/src/hevm#cheat-codes
@@ -37,26 +37,14 @@ contract Hevm {
     }
 
     function setUSDCBalance(address account, uint256 amount) public {
-        hevm.store(
-            USDC_ADDRESS,
-            keccak256(abi.encode(account, USDC_SLOT)),
-            bytes32(amount)
-        );
+        hevm.store(USDC_ADDRESS, keccak256(abi.encode(account, USDC_SLOT)), bytes32(amount));
     }
 
     function setUSDTBalance(address account, uint256 amount) public {
-        hevm.store(
-            USDT_ADDRESS,
-            keccak256(abi.encode(account, USDT_SLOT)),
-            bytes32(amount)
-        );
+        hevm.store(USDT_ADDRESS, keccak256(abi.encode(account, USDT_SLOT)), bytes32(amount));
     }
 
     function setWETHBalance(address account, uint256 amount) public {
-        hevm.store(
-            WETH_ADDRESS,
-            keccak256(abi.encode(account, WETH_SLOT)),
-            bytes32(amount)
-        );
+        hevm.store(WETH_ADDRESS, keccak256(abi.encode(account, WETH_SLOT)), bytes32(amount));
     }
 }
