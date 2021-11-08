@@ -35,36 +35,26 @@ contract RiseTokenVault is RisedleVault {
 
     /**
      * @notice Construct new RiseTokenVault
-     * @param name The name of the vault's token (e.g. Risedle USDC Vault)
-     * @param symbol The symbol of the vault's token (e.g rvUSDC)
-     * @param underlying The ERC20 address of the vault's underlying token (e.g. address of USDC token)
      */
     constructor(
-        string memory name,
-        string memory symbol,
-        address underlying
+        string memory name, // The name of the vault's token (e.g. Risedle USDC Vault)
+        string memory symbol, // The symbol of the vault's token (e.g rvUSDC)
+        address underlying // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
     ) RisedleVault(name, symbol, underlying) {}
 
     /**
      * @notice create creates new RISE token
      * @dev Only admin can call this function
-     * @param name The name of the RISE token (e.g. ETH 2x Leverage Risedle)
-     * @param symbol The symbol of the RISE token (e.g. ETHRISE)
-     * @param collateral The underlying token of RISE token (e.g. WETH)
-     * @param feed Chainlink like price feed (e.g. ETH/USD)
-     * @param swap Uniswap V3 like token swapper
-     * @param initialPrice Initial price of the ETF based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
-     * @param feeInEther Creation and redemption fee in ether units (e.g. 0.001 ether = 0.1%)
      * @return The address of the new RISE token
      */
     function create(
-        string memory name,
-        string memory symbol,
-        address collateral,
-        address feed,
-        address swap,
-        uint256 initialPrice,
-        uint256 feeInEther
+        string memory name, // The name of the RISE token (e.g. ETH 2x Leverage Risedle)
+        string memory symbol, // The symbol of the RISE token (e.g. ETHRISE)
+        address collateral, // The underlying token of RISE token (e.g. WETH)
+        address feed, // Chainlink like price feed (e.g. ETH/USD)
+        address swap, // Uniswap V3 like token swapper
+        uint256 initialPrice, // Initial price of the ETF based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
+        uint256 feeInEther // Creation and redemption fee in ether units (e.g. 0.001 ether = 0.1%)
     ) external onlyOwner returns (address) {
         // Get collateral decimals
         uint8 collateralDecimals = IERC20Metadata(collateral).decimals();
