@@ -10,6 +10,7 @@ import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20
 
 import { Hevm } from "./Hevm.sol";
 import { RiseTokenVault } from "../RiseTokenVault.sol";
+import { IRisedleERC20 } from "../interfaces/IRisedleERC20.sol";
 
 import { USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_USDC_USD, CHAINLINK_ETH_USD } from "chain/Constants.sol";
 
@@ -71,5 +72,53 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         assertEq(riseTokenMetadata.feeInEther, 0.001 ether); // 0.1%
         assertEq(riseTokenMetadata.totalCollateral, 0);
         assertEq(riseTokenMetadata.totalPendingFees, 0);
+    }
+
+    /// @notice Make sure only vault can mint the RISE token
+    function testFail_NonRiseTokenVaultCannotMintRiseToken() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Create dummy swapper address
+        address uniswapV3Swapper = hevm.addr(1);
+
+        // Create new RISE token as owner
+        address riseToken = vault.create(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            WETH_ADDRESS,
+            CHAINLINK_ETH_USD,
+            uniswapV3Swapper,
+            100 * 1e6, // 100 USDC
+            0.001 ether // 0.1%
+        );
+
+        // Event the vault's owner cannot mint the RISE token
+        address mintTo = hevm.addr(2);
+        IRisedleERC20(riseToken).mint(mintTo, 1 ether); // Should be failed
+    }
+
+    /// @notice Make sure only vault can burn the RISE token
+    function testFail_NonRiseTokenVaultCannotBurnRiseToken() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Create dummy swapper address
+        address uniswapV3Swapper = hevm.addr(1);
+
+        // Create new RISE token as owner
+        address riseToken = vault.create(
+            "ETH 2x Leverage Risedle",
+            "ETHRISE",
+            WETH_ADDRESS,
+            CHAINLINK_ETH_USD,
+            uniswapV3Swapper,
+            100 * 1e6, // 100 USDC
+            0.001 ether // 0.1%
+        );
+
+        // Event the vault's owner cannot burn the RISE token
+        address burnFrom = hevm.addr(2);
+        IRisedleERC20(riseToken).burn(burnFrom, 1 ether); // Should be failed
     }
 }

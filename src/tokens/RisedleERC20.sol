@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Risedle ERC20 Contract
-// ERC20 contract to represents vault, leverage and hedge token.
+// ERC20 contract to leverage and hedge token.
 // It allows the owner to mint/burn token. On the production setup,
-// only Risedle Market can mint/burn this token.
+// only Risedle Vault can mint/burn this token.
+// It's been validated using dapp tools HEVM verification.
 //
 // Copyright (c) 2021 Bayu - All rights reserved
 // github: pyk
@@ -14,12 +15,6 @@ pragma experimental ABIEncoderV2;
 
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { Ownable } from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-
-interface IRisedleERC20 {
-    function mint(address to, uint256 amount) external;
-
-    function burn(address from, uint256 amount) external;
-}
 
 /// @notice Risedle ERC20 implementation
 contract RisedleERC20 is ERC20, Ownable {
