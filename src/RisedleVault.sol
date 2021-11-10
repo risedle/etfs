@@ -50,18 +50,15 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice The total amount of pending fees to be collected in the vault
     uint256 public totalPendingFees;
 
+    /// @notice The total debt proportion issued by the vault, the usage is similar to the vault token supply. In order to track the outstanding debt of the RISE/DROP token
+    uint256 internal totalDebtProportion;
+
+    /// @notice Mapping RISE/DROP token to their debt proportion of totalOutstandingDebt
+    /// @dev debt = debtProportion[token] * debtProportionRate
+    mapping(address => uint256) internal debtProportion;
+
     /// @notice Event emitted when the interest succesfully accrued
-    event InterestAccrued(
-        uint256 previousTimestamp,
-        uint256 currentTimestamp,
-        uint256 previousVaultTotalOutstandingDebt,
-        uint256 previousVaultTotalPendingFees,
-        uint256 borrowRatePerSecondInEther,
-        uint256 elapsedSeconds,
-        uint256 interestAmount,
-        uint256 totalOutstandingDebt,
-        uint256 totalPendingFees
-    );
+    event InterestAccrued(uint256 previousTimestamp, uint256 currentTimestamp, uint256 previousVaultTotalOutstandingDebt, uint256 previousVaultTotalPendingFees, uint256 borrowRatePerSecondInEther, uint256 elapsedSeconds, uint256 interestAmount, uint256 totalOutstandingDebt, uint256 totalPendingFees);
 
     /// @notice Event emitted when lender add supply to the vault
     event SupplyAdded(address indexed account, uint256 amount, uint256 ExchangeRateInEther, uint256 mintedAmount);
@@ -80,14 +77,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice Construct new RisedleVault
-     * @param name The name of the vault's token (e.g. Risedle USDC Vault)
-     * @param symbol The symbol of the vault's token (e.g rvUSDC)
-     * @param underlying The ERC20 address of the vault's underlying token (e.g. address of USDC token)
      */
     constructor(
-        string memory name,
-        string memory symbol,
-        address underlying
+        string memory name, // The name of the vault's token (e.g. Risedle USDC Vault)
+        string memory symbol, // The symbol of the vault's token (e.g rvUSDC)
+        address underlying // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
     ) ERC20(name, symbol) {
         // Set the vault underlying token
         underlyingToken = underlying;
@@ -115,8 +109,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getTotalAvailableCash returns the total amount of vault's
-     *         underlying token that available to borrow
+     * @notice getTotalAvailableCash returns the total amount of vault's underlying token that available to borrow
      * @return The amount of vault's underlying token available to borrow
      */
     function getTotalAvailableCash() public view returns (uint256) {
@@ -126,8 +119,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice calculateUtilizationRateInEther calculates the utilization rate of
-     *         the vault.
+     * @notice calculateUtilizationRateInEther calculates the utilization rate of the vault.
      * @param available The amount of cash available to borrow in the vault
      * @param outstandingDebt The amount of outstanding debt in the vault
      * @return The utilization rate in ether units
@@ -155,8 +147,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice calculateBorrowRatePerSecondInEther calculates the borrow rate per second
-     *         in ether units
+     * @notice calculateBorrowRatePerSecondInEther calculates the borrow rate per second in ether units
      * @param utilizationRateInEther The current utilization rate in ether units
      * @return The borrow rate per second in ether units
      */
@@ -194,8 +185,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getBorrowRatePerSecondInEther returns the current borrow rate
-     *         per seconds
+     * @notice getBorrowRatePerSecondInEther returns the current borrow rate per seconds
      * @return borrowRateInEther The borrow rate per second in ether units
      */
     function getBorrowRatePerSecondInEther() public view returns (uint256 borrowRateInEther) {
@@ -204,8 +194,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getSupplyRatePerSecondInEther calculates the supply rate per second
-     *         in ether units
+     * @notice getSupplyRatePerSecondInEther calculates the supply rate per second in ether units
      * @return supplyRateInEther The supply rate per second in ether units
      */
     function getSupplyRatePerSecondInEther() public view returns (uint256 supplyRateInEther) {
@@ -217,18 +206,13 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice getInterestAmount calculate amount of interest based on the total
-     *         outstanding debt and borrow rate per second.
-     * @param outstandingDebt Total of outstanding debt, in underlying decimals
-     * @param borrowRatePerSecondInEther Borrow rates per second in ether units
-     * @param elapsedSeconds Number of seconds elapsed since last accrued
-     * @return The total interest amount, it have similar decimals with
-     *         totalOutstandingDebt and totalVaultPendingFees.
+     * @notice getInterestAmount calculate amount of interest based on the total outstanding debt and borrow rate per second.
+     * @return The total interest amount, it have similar decimals with totalOutstandingDebt and totalVaultPendingFees.
      */
     function getInterestAmount(
-        uint256 outstandingDebt,
-        uint256 borrowRatePerSecondInEther,
-        uint256 elapsedSeconds
+        uint256 outstandingDebt, // Total of outstanding debt, in underlying decimals
+        uint256 borrowRatePerSecondInEther, // Borrow rates per second in ether units
+        uint256 elapsedSeconds // Number of seconds elapsed since last accrued
     ) internal pure returns (uint256) {
         // Early returns
         if (outstandingDebt == 0 || borrowRatePerSecondInEther == 0 || elapsedSeconds == 0) {
@@ -242,9 +226,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice setVaultStates update the totalOutstandingDebt and totalOutstandingDebt
-     * @param interestAmount The total of interest amount to be splitted, the decimals
-     *        is similar to totalOutstandingDebt and totalOutstandingDebt.
+     * @notice setVaultStates update the totalOutstandingDebt and totalPendingFees
+     * @param interestAmount The total of interest amount to be splitted, the decimals is similar to totalOutstandingDebt and totalPendingFees.
      * @param currentTimestamp The current timestamp when the interest is accrued
      */
     function setVaultStates(uint256 interestAmount, uint256 currentTimestamp) internal {
@@ -258,11 +241,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice accrueInterest accrues interest to totalOutstandingDebt and
-     *         totalPendingFees
-     * @dev This calculates interest accrued from the last checkpointed timestamp
-     *      up to the current timestamp and update the totalOutstandingDebt
-     *      and totalPendingFees
+     * @notice accrueInterest accrues interest to totalOutstandingDebt and totalPendingFees
+     * @dev This calculates interest accrued from the last checkpointed timestamp up to the current timestamp and update the totalOutstandingDebt and totalPendingFees
      */
     function accrueInterest() public {
         // Get the current timestamp, get last timestamp accrued and set the last time accrued
@@ -290,22 +270,11 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         setVaultStates(interestAmount, currentTimestamp);
 
         // Emit the event
-        emit InterestAccrued(
-            previousTimestamp,
-            currentTimestamp,
-            previousVaultTotalOutstandingDebt,
-            previousVaultTotalPendingFees,
-            borrowRatePerSecondInEther,
-            elapsedSeconds,
-            interestAmount,
-            totalOutstandingDebt,
-            totalPendingFees
-        );
+        emit InterestAccrued(previousTimestamp, currentTimestamp, previousVaultTotalOutstandingDebt, previousVaultTotalPendingFees, borrowRatePerSecondInEther, elapsedSeconds, interestAmount, totalOutstandingDebt, totalPendingFees);
     }
 
     /**
-     * @notice getExchangeRateInEther get the current exchange rate of vault token
-     *         in term of Vault's underlying token.
+     * @notice getExchangeRateInEther get the current exchange rate of vault token in term of Vault's underlying token.
      * @return The exchange rates in ether units
      */
     function getExchangeRateInEther() public view returns (uint256) {
@@ -370,5 +339,36 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         // Emit event
         emit SupplyRemoved(msg.sender, amount, exchangeRateInEther, redeemedAmount);
+    }
+
+    /**
+     * @notice getDebtProportionRateInEther returns the proportion of borrow amount relative to the totalOutstandingDebt
+     * @return debtProportionRateInEther The debt proportion rate in ether units
+     */
+    function getDebtProportionRateInEther() internal view returns (uint256 debtProportionRateInEther) {
+        if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
+            return 1 ether;
+        }
+        debtProportionRateInEther = (totalOutstandingDebt * 1 ether) / totalDebtProportion;
+    }
+
+    /**
+     * @notice getOutstandingDebt returns the debt owed by the RISE/DROP tokens
+     * @param token The RISE/DROP token address
+     */
+    function getOutstandingDebt(address token) public view returns (uint256) {
+        // If there is no debt, return 0
+        if (totalOutstandingDebt == 0) {
+            return 0;
+        }
+
+        // Calculate the outstanding debt
+        // outstanding debt = debtProportion * debtProportionRate
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        uint256 a = (debtProportion[token] * debtProportionRateInEther);
+        uint256 b = 1 ether;
+        uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
+
+        return outstandingDebt;
     }
 }
