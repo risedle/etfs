@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Rise Token Vault Internal Test
+// Test & validate all Rise Token Vault internal functionalities
+
+pragma solidity 0.8.9;
+pragma experimental ABIEncoderV2;
+
+import "lib/ds-test/src/test.sol";
+
+import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+import { Hevm } from "./Hevm.sol";
+import { RiseTokenVault } from "../RiseTokenVault.sol";
+
+// chain/* is replaced by DAPP_REMAPPINGS at compile time, this allow us to use custom address on specific chain
+// See .dapprc
+import { USDC_ADDRESS } from "chain/Constants.sol";
+
+// Set Risedle's Vault properties
+string constant tokenName = "Risedle USDC Vault";
+string constant tokenSymbol = "rvUSDC";
+address constant underlying = USDC_ADDRESS;
+
+contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSymbol, underlying) {
+    /// @notice hevm utils to alter mainnet state
+    Hevm hevm;
+
+    function setUp() public {
+        hevm = new Hevm();
+    }
+
+    /// @notice Make sure the collateral per RISE token is working as expected
+    function test_GetCollateralPerRiseToken() public {
+        uint256 collateralPerRiseToken;
+        uint256 riseTokenTotalSupply;
+        uint256 riseTokenTotalCollateral;
+        uint256 riseTokenTotalPendingFees;
+        uint8 riseTokenCollateralDecimals;
+
+        // Initial state, collateral per RiseToken should be zero
+        riseTokenTotalSupply = 0;
+        riseTokenTotalCollateral = 0;
+        riseTokenTotalPendingFees = 0;
+        riseTokenCollateralDecimals = 18;
+        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        assertEq(collateralPerRiseToken, 0);
+
+        // Set RiseToken states
+        riseTokenTotalSupply = 10 ether;
+        riseTokenTotalCollateral = 9 ether;
+        riseTokenTotalPendingFees = 1 ether;
+        riseTokenCollateralDecimals = 18;
+        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        assertEq(collateralPerRiseToken, 0.8 ether);
+
+        // User very large number
+        riseTokenTotalSupply = (10 * 1e12) * 1 ether;
+        riseTokenTotalCollateral = (9 * 1e12) * 1 ether;
+        riseTokenTotalPendingFees = (1 * 1e12) * 1 ether;
+        riseTokenCollateralDecimals = 18;
+        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        assertEq(collateralPerRiseToken, 0.8 ether);
+    }
+
+    /// @notice Make sure it fails when totalPendingFees > totalCollateral
+    function testFail_GetCollateralPerRiseTokenFeeTooLarge() public pure {
+        // Test too large fees
+        uint256 riseTokenTotalSupply = 10 ether;
+        uint256 riseTokenTotalCollateral = 12 ether;
+        uint256 riseTokenTotalPendingFees = 15 ether;
+        uint8 riseTokenCollateralDecimals = 18;
+        // This should be failed
+        getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+    }
+
+    // Utils to set the total debt of given RiseToken
+    function setRiseTokenDebt(address riseToken, uint256 borrowAmount) internal {
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        uint256 borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[riseToken] = debtProportion[riseToken] + borrowProportion;
+    }
+
+    /// @notice Make sure getDebtPerRiseToken is correct
+    function test_GetDebtPerRiseToken() public {
+        address riseToken;
+        uint256 borrowAmount;
+        uint256 riseTokenTotalSupply;
+        uint256 debtPerRiseToken;
+        uint8 riseTokenCollateralDecimals = 18;
+
+        // Initial state it should be zero
+        riseToken = hevm.addr(1);
+        borrowAmount = 0;
+        setRiseTokenDebt(riseToken, borrowAmount);
+        riseTokenTotalSupply = 0;
+        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        assertEq(debtPerRiseToken, 0);
+
+        // Create new Risedle RiseToken token
+        riseToken = hevm.addr(2);
+        borrowAmount = 1000 * 1e6; // 1K USDC
+        setRiseTokenDebt(riseToken, borrowAmount);
+        riseTokenTotalSupply = 10 ether;
+        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        assertEq(debtPerRiseToken, 100 * 1e6); // 100 USDC per RiseToken
+
+        // Let's simulate other RiseToken borrow once again
+        riseToken = hevm.addr(3);
+        borrowAmount = 2000 * 1e6; // 2K USDC
+        setRiseTokenDebt(riseToken, borrowAmount);
+        riseTokenTotalSupply = 10 ether;
+        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        assertEq(debtPerRiseToken, 200 * 1e6); // 200 USDC per RiseToken
+    }
+
+    /// @notice Make sure the NAV calculation is correct
+    function test_CalculateNAV() public {
+        uint256 riseTokenNAV;
+        uint256 collateralPerRiseToken;
+        uint256 debtPerRiseToken;
+        uint256 collateralPrice;
+        uint256 riseTokenInitialPrice = 100 * 1e6; // 100 USDC
+        uint8 riseTokenCollateralDecimals = 18;
+
+        // Initial state should be the initial price
+        collateralPerRiseToken = 0;
+        debtPerRiseToken = 0; // 1.2K USDC
+        collateralPrice = 0; // 3.2K USDC
+        riseTokenNAV = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenInitialPrice, riseTokenCollateralDecimals);
+        assertEq(riseTokenNAV, riseTokenInitialPrice);
+
+        // Set the collateralPerRiseToken and debtPerRiseToken
+        collateralPerRiseToken = 0.9 ether;
+        debtPerRiseToken = 1200 * 1e6; // 1.2K USDC
+        collateralPrice = 3200 * 1e6; // 3.2K USDC
+        riseTokenNAV = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenInitialPrice, riseTokenCollateralDecimals);
+        assertEq(riseTokenNAV, 1680 * 1e6);
+    }
+}
