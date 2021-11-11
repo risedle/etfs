@@ -10,20 +10,25 @@ pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 import { IERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { RisedleVault } from "./RisedleVault.sol";
 import { RisedleERC20 } from "./tokens/RisedleERC20.sol";
 
 import { IRisedleOracle } from "./interfaces/IRisedleOracle.sol";
+import { IRisedleSwap } from "./interfaces/IRisedleSwap.sol";
+import { IRisedleERC20 } from "./interfaces/IRisedleERC20.sol";
 
 contract RiseTokenVault is RisedleVault {
+    using SafeERC20 for IERC20;
+
     /// @notice RiseTokenMetadata contains the metadata of RISE token
     struct RiseTokenMetadata {
         address token; // Address of ETF token ERC20, make sure this vault can mint & burn this token
         address collateral; // ETF underlying asset (e.g. WETH address)
         address oracle; // Contract address that implement IRisedleOracle interface
-        address swap; // Uniswap v3 swap like contract
+        address swap; // Contract address that implment IRisedleSwap interface
         uint256 initialPrice; // In term of vault's underlying asset (e.g. 100 USDC -> 100 * 1e6, coz is 6 decimals for USDC)
         uint256 feeInEther; // Creation and redemption fee in ether units (e.g. 0.1% is 0.001 ether)
         uint256 totalCollateral; // Total amount of underlying managed by this ETF
@@ -35,6 +40,9 @@ contract RiseTokenVault is RisedleVault {
 
     /// @notice Event emitted when new RISE token is created
     event RiseTokenCreated(address indexed creator, address token);
+
+    /// @notice Event emitted when RISE token is minted
+    event RiseTokenMinted(address indexed user, address indexed riseToken, uint256 mintedAmount);
 
     /**
      * @notice Construct new RiseTokenVault
@@ -172,6 +180,68 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
+     * @notice getCollateralAndFeeAmount splits collateral and fee amount
+     * @param amount The amount of RISE token collateral deposited by the user
+     * @param feeInEther The RISE token creation and redemption fee in ether units (e.g. 0.001 ether = 0.1%)
+     * @return collateralAmount The collateral amount
+     * @return feeAmount The fee amount collected by the protocol
+     */
+    function getCollateralAndFeeAmount(uint256 amount, uint256 feeInEther) internal pure returns (uint256 collateralAmount, uint256 feeAmount) {
+        feeAmount = (amount * feeInEther) / 1 ether;
+        collateralAmount = amount - feeAmount;
+    }
+
+    /**
+     * @notice borrowAndSwap borrow supply asset from the vault and buy more collateral
+     * @return borrowAmount The amount of supply borrowed to 2x leverage the collateralAmount
+     */
+    function borrowAndSwap(
+        address swap, // The address of swap contract
+        address collateralToken, // The address of the collateral token
+        uint256 collateralAmount, // The collateral amount
+        uint256 collateralPrice, // The collateral price
+        uint8 collateralDecimals // The collateral decimals
+    ) internal returns (uint256 borrowAmount) {
+        // Maximum plus +1% from the oracle price
+        uint256 maximumCollateralPrice = collateralPrice + ((0.01 ether * collateralPrice) / 1 ether);
+
+        // Get the collateral value
+        uint256 maxSupplyOut = (collateralAmount * maximumCollateralPrice) / (10**collateralDecimals);
+
+        // Make sure we do have enough vault's underlying available
+        require(getTotalAvailableCash() > maxSupplyOut, "!NES");
+
+        // Allow swap contract to spend the vault's underlying token
+        IERC20(underlyingToken).safeApprove(swap, maxSupplyOut);
+
+        // Buy more collateral using the Risedle Swap contract
+        // We want to get exact amount of collateral with minimal vault's underlying as possible
+        borrowAmount = IRisedleSwap(swap).swap(underlyingToken, collateralToken, maxSupplyOut, collateralAmount);
+
+        // Reset the approval
+        IERC20(underlyingToken).safeApprove(swap, 0);
+    }
+
+    /**
+     * @notice getMintAmount returns the amount of RISE token need to be minted
+     * @return mintedAmount The amount of ETF token need to be minted
+     */
+    function getMintAmount(
+        uint256 nav, // The net asset value of RISE token (e.g. 200 USDC is 200 * 1e6)
+        uint256 collateralAmount, // The amount of the collateral (e.g. 1 ETH is 1e18)
+        uint256 collateralPrice, // The price of the collateral (e.g. 4000 USDC is 4000 * 1e6)
+        uint256 borrowAmount, // The amount of borrow (e.g 200 USDC is 200 * 1e6)
+        uint8 collateralDecimals // The decimals of the collateral token (e.g. ETH have 18 decimals)
+    ) internal pure returns (uint256 mintedAmount) {
+        // Calculate the total investment
+        // totalInvestment = (2 x collateralValue) - borrowAmount
+        uint256 totalInvestment = ((2 * collateralAmount * collateralPrice) / (10**collateralDecimals)) - borrowAmount;
+
+        // Get minted amount
+        mintedAmount = (totalInvestment * (10**collateralDecimals)) / nav;
+    }
+
+    /**
      * @notice Mint new RISE token
      * @param token The address of RISE token
      * @param amount The collateral amount
@@ -185,7 +255,36 @@ contract RiseTokenVault is RisedleVault {
         require(riseTokenMetadata.feeInEther > 0, "!RTNE");
 
         // Get the current net-asset value of the RISE token in term of underlying
-        // For example, ETH will trading around 4000 USDC (4000 * 1e6)
-        uint256 riseTokenNAV = getNAV(token);
+        // For example, If ETHRISE nav is 200 USDC, it will returns 200 * 1e6
+        uint256 nav = getNAV(token);
+
+        // Transfer the collateral to the vault
+        IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
+
+        // Get the collateral and fee amount
+        (uint256 collateralAmount, uint256 feeAmount) = getCollateralAndFeeAmount(amount, riseTokenMetadata.feeInEther);
+
+        // Update the RISE token metadata
+        riseTokens[riseTokenMetadata.token].totalCollateral += ((2 * collateralAmount) + feeAmount);
+        riseTokens[riseTokenMetadata.token].totalPendingFees += feeAmount;
+
+        // Get the current price of collateral in term of vault underlying asset
+        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracle).getPrice();
+
+        // Get the borrow amount
+        uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
+        uint256 borrowAmount = borrowAndSwap(riseTokenMetadata.swap, riseTokenMetadata.collateral, collateralAmount, collateralPrice, collateralDecimals);
+
+        // Set RISE token debt states
+        setBorrowStates(token, borrowAmount);
+
+        // Calculate minted amount
+        uint256 mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowAmount, collateralDecimals);
+
+        // Transfer RISE token to the caller
+        IRisedleERC20(token).mint(msg.sender, mintedAmount);
+
+        // Emit the event
+        emit RiseTokenMinted(msg.sender, token, mintedAmount);
     }
 }

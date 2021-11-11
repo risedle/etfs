@@ -8,14 +8,18 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
+import { IERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { Hevm } from "./Hevm.sol";
 import { RiseTokenVault } from "../RiseTokenVault.sol";
+import { UniswapV3Swap } from "../swaps/UniswapV3Swap.sol";
+import { ChainlinkOracle } from "../oracles/ChainlinkOracle.sol";
+import { IRisedleOracle } from "../interfaces/IRisedleOracle.sol";
 
 // chain/* is replaced by DAPP_REMAPPINGS at compile time, this allow us to use custom address on specific chain
 // See .dapprc
-import { USDC_ADDRESS } from "chain/Constants.sol";
+import { USDC_ADDRESS, WETH_ADDRESS, UNISWAPV3_SWAP_ROUTER, CHAINLINK_USDC_USD, CHAINLINK_ETH_USD } from "chain/Constants.sol";
 
 // Set Risedle's Vault properties
 string constant tokenName = "Risedle USDC Vault";
@@ -138,5 +142,122 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         collateralPrice = 3200 * 1e6; // 3.2K USDC
         riseTokenNAV = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenInitialPrice, riseTokenCollateralDecimals);
         assertEq(riseTokenNAV, 1680 * 1e6);
+    }
+
+    /// @notice Make sure the fee calculation is correct
+    function test_GetCollateralAndFeeAmount() public {
+        uint256 amount;
+        uint256 feeInEther;
+        uint256 outputCollateralAmount;
+        uint256 outputFeeAmount;
+        uint256 expectedCollateralAmount;
+        uint256 expectedFeeAmount;
+
+        amount = 50 ether;
+        feeInEther = 0.001 ether; // 0.1%
+        expectedCollateralAmount = 49.95 ether;
+        expectedFeeAmount = 0.05 ether;
+        (outputCollateralAmount, outputFeeAmount) = getCollateralAndFeeAmount(amount, feeInEther);
+        assertEq(outputCollateralAmount, expectedCollateralAmount);
+        assertEq(outputFeeAmount, expectedFeeAmount);
+
+        // Test with very large number
+        amount = (120 * 1e12) * 1 ether; // 120 trillion ether
+        feeInEther = 0.001 ether; // 0.1%
+        expectedCollateralAmount = (11988 * 1e10) * 1 ether;
+        expectedFeeAmount = (12 * 1e10) * 1 ether;
+        (outputCollateralAmount, outputFeeAmount) = getCollateralAndFeeAmount(amount, feeInEther);
+        assertEq(outputCollateralAmount, expectedCollateralAmount);
+        assertEq(outputFeeAmount, expectedFeeAmount);
+    }
+
+    /// @notice Make sure borrow and swap is correct
+    function testFail_CannotBorrowAndSwapIfNoCashIsAvailable() public {
+        // Set the contract balance to zero
+        hevm.setUSDCBalance(address(this), 0);
+        assertEq(getTotalAvailableCash(), 0);
+
+        // Use Uniswap V3 WETH/USDC 0.05% fee liquidity
+        UniswapV3Swap uniswap = new UniswapV3Swap(UNISWAPV3_SWAP_ROUTER, 500);
+
+        // Execute the borrow and swap
+        uint256 collateralAmount = 1 ether;
+        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC we don't need to be precise here
+
+        // Need 4000 USDC available; this should be failed
+        borrowAndSwap(address(uniswap), WETH_ADDRESS, collateralAmount, collateralPrice, 18);
+    }
+
+    /// @notice Make sure borrow and swap is correct
+    function testFail_CannotBorrowAndSwapIfAvailableCashIsLessThanCollateralValue() public {
+        // Set the contract balance to 1K USDC
+        hevm.setUSDCBalance(address(this), 1000 * 1e6); // 1K USDC
+        assertEq(getTotalAvailableCash(), 1000 * 1e6); // 1K USDC
+
+        // Use Uniswap V3 WETH/USDC 0.05% fee liquidity
+        UniswapV3Swap uniswap = new UniswapV3Swap(UNISWAPV3_SWAP_ROUTER, 500);
+
+        // Execute the borrow and swap
+        uint256 collateralAmount = 1 ether;
+        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC we don't need to be precise here
+
+        // Need 4000 USDC, only 1000 USDC available; this should be failed
+        borrowAndSwap(address(uniswap), WETH_ADDRESS, collateralAmount, collateralPrice, 18);
+    }
+
+    /// @notice Make sure collateral token is sent to the vault
+    function test_BorrowAndSwapSentAssetToTheVault() public {
+        // Set the contract balance to 20K USDC
+        hevm.setUSDCBalance(address(this), 20000 * 1e6); // 20K USDC
+        assertEq(getTotalAvailableCash(), 20000 * 1e6); // 20K USDC
+
+        // Use Uniswap V3 WETH/USDC 0.05% fee liquidity
+        UniswapV3Swap uniswap = new UniswapV3Swap(UNISWAPV3_SWAP_ROUTER, 500);
+
+        // Use Chainlink oracle
+        ChainlinkOracle oracle = new ChainlinkOracle(CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
+
+        // Execute the borrow and swap
+        uint256 collateralAmount = 1 ether;
+        uint256 collateralPrice = IRisedleOracle(address(oracle)).getPrice();
+
+        // Swap USDC to WETH
+        uint256 amountIn = borrowAndSwap(address(uniswap), WETH_ADDRESS, collateralAmount, collateralPrice, 18);
+
+        // Make sure the WETH is transfered to the vault
+        assertEq(IERC20(WETH_ADDRESS).balanceOf(address(this)), collateralAmount);
+
+        // Make sure the amountIn is not more than amountIn+1%
+        uint256 maximumCollateralPrice = collateralPrice + ((0.01 ether * collateralPrice) / 1 ether);
+        assertLt(amountIn, maximumCollateralPrice);
+
+        // Make sure the getTotalAvaileCash is updated
+        assertEq(getTotalAvailableCash(), (20000 * 1e6) - amountIn);
+    }
+
+    /// @notice Make sure the getMintAmount is correct
+    function test_GetMintAmount() public {
+        uint256 nav;
+        uint256 collateralAmount;
+        uint256 collateralPrice;
+        uint256 borrowAmount;
+        uint256 mintedAmount;
+        uint8 collateralDecimals = 18;
+
+        // First scenario
+        nav = 200 * 1e6; // 200 USDC
+        collateralAmount = 1 ether; // 2 ether
+        collateralPrice = 4000 * 1e6; // 4K USDC
+        borrowAmount = collateralPrice;
+        mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowAmount, collateralDecimals);
+        assertEq(mintedAmount, 20 ether);
+
+        // Second scenario
+        nav = 145 * 1e6; // 145 USDC
+        collateralAmount = 1 ether; // 2 ether
+        collateralPrice = 4000 * 1e6; // 4K USDC
+        borrowAmount = collateralPrice;
+        mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowAmount, collateralDecimals);
+        assertEq(mintedAmount, 27586206896551724137);
     }
 }

@@ -371,4 +371,17 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
         return outstandingDebt;
     }
+
+    /**
+     * @notice setBorrowStates sets the debt of the RISE/DROP token
+     * @param token The address of the RISE token
+     * @param borrowAmount The amount that borrowed by the RISE/DROP token
+     */
+    function setBorrowStates(address token, uint256 borrowAmount) internal {
+        uint256 debtProportionRateInEther = getDebtProportionRateInEther();
+        totalOutstandingDebt += borrowAmount;
+        uint256 borrowProportion = (borrowAmount * 1 ether) / debtProportionRateInEther;
+        totalDebtProportion += borrowProportion;
+        debtProportion[token] = debtProportion[token] + borrowProportion;
+    }
 }
