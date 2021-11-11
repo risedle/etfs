@@ -66,7 +66,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(riseToken);
         assertEq(riseTokenMetadata.token, riseToken);
         assertEq(riseTokenMetadata.collateral, WETH_ADDRESS);
-        assertEq(riseTokenMetadata.feed, CHAINLINK_ETH_USD);
+        assertEq(riseTokenMetadata.oracle, CHAINLINK_ETH_USD);
         assertEq(riseTokenMetadata.swap, uniswapV3Swapper);
         assertEq(riseTokenMetadata.initialPrice, 100 * 1e6); // 100 USDC
         assertEq(riseTokenMetadata.feeInEther, 0.001 ether); // 0.1%
