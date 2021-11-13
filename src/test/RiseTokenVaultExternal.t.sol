@@ -189,7 +189,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Third investor, collateral price go up, nav go up, should receive less amount of ETHRISE token
         oracle.setPrice(4200 * 1e6);
-        assertEq(vault.getNAV(riseTokenAddress), 110049236, "3: NAV invalid"); // ~110 USDC  Investor secondInvestor = new Investor(vault);
+        assertEq(vault.getNAV(riseTokenAddress), 110049236, "3: NAV invalid"); // ~110 USDC
         Investor thirdInvestor = new Investor(vault);
         hevm.setWETHBalance(address(thirdInvestor), depositAmount);
         thirdInvestor.mint(riseTokenAddress, depositAmount);
@@ -198,7 +198,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Fourth investor, collateral price go down, nav go down, should receive more amount of ETHRISE token
         oracle.setPrice(4100 * 1e6);
-        assertEq(vault.getNAV(riseTokenAddress), 104946579, "4: NAV invalid"); // ~110 USDC  Investor secondInvestor = new Investor(vault);
+        assertEq(vault.getNAV(riseTokenAddress), 104946579, "4: NAV invalid"); // ~104 USDC
         Investor forthInvestor = new Investor(vault);
         hevm.setWETHBalance(address(forthInvestor), depositAmount);
         forthInvestor.mint(riseTokenAddress, depositAmount);
