@@ -171,7 +171,46 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(riseTokenMetadata.totalPendingFees, 0.001 ether, "RISE token totalPendingFees is invalid"); // 0.1% from deposit amount
 
         // Make sure the totalDebt of the RISE token is correct
-        assertEq(vault.getOutstandingDebt(riseTokenAddress), 4015578402, "Borrow amount is invalid"); // Bought 4000 USDC with 0.5% slippage
+        assertEq(vault.getOutstandingDebt(riseTokenAddress), 4015578402, "Borrow amount is invalid"); // Bought 4000 USDC with ~0.5% slippage
+
+        // Make sure the total available cash is correct
+        assertEq(vault.getTotalAvailableCash(), vaultSupplyAmount - 4015578402, "Total available cash is invalid");
+
+        // Make sure the NAV doesn't change
+        assertEq(vault.getNAV(riseTokenAddress), initialPrice);
+
+        // Second investor with same deposit amount should have the same amount of minted token
+        Investor secondInvestor = new Investor(vault);
+        hevm.setWETHBalance(address(secondInvestor), depositAmount);
+        secondInvestor.mint(riseTokenAddress, depositAmount);
+        riseTokenBalance = IERC20(riseTokenAddress).balanceOf(address(secondInvestor));
+        assertEq(riseTokenBalance, 39764215980000000000, "2: Wrong balance");
+        assertEq((riseTokenBalance * initialPrice) / 1 ether, 3976421598, "2: RISE token worth value is not as described"); // Based on totalInvestment (fee and slippage)
+
+        // Third investor, collateral price go up, nav go up, should receive less amount of ETHRISE token
+        oracle.setPrice(4200 * 1e6);
+        assertEq(vault.getNAV(riseTokenAddress), 110049236, "3: NAV invalid"); // ~110 USDC  Investor secondInvestor = new Investor(vault);
+        Investor thirdInvestor = new Investor(vault);
+        hevm.setWETHBalance(address(thirdInvestor), depositAmount);
+        thirdInvestor.mint(riseTokenAddress, depositAmount);
+        riseTokenBalance = IERC20(riseTokenAddress).balanceOf(address(thirdInvestor));
+        assertEq(riseTokenBalance, 37939769777229530244, "3: Wrong RISE token balance");
+
+        // Fourth investor, collateral price go down, nav go down, should receive more amount of ETHRISE token
+        oracle.setPrice(4100 * 1e6);
+        assertEq(vault.getNAV(riseTokenAddress), 104946579, "4: NAV invalid"); // ~110 USDC  Investor secondInvestor = new Investor(vault);
+        Investor forthInvestor = new Investor(vault);
+        hevm.setWETHBalance(address(forthInvestor), depositAmount);
+        forthInvestor.mint(riseTokenAddress, depositAmount);
+        riseTokenBalance = IERC20(riseTokenAddress).balanceOf(address(forthInvestor));
+        assertEq(riseTokenBalance, 38837208195228545753, "4: Wrong RISE token balance");
+
+        // Validate the RISE token states
+        riseTokenMetadata = vault.getMetadata(riseTokenAddress);
+        assertEq(riseTokenMetadata.totalCollateral, 7996000000000000000, "RISE token totalCollateral is wrong"); // 2x4 WETH minus fee
+        assertEq(riseTokenMetadata.totalPendingFees, 0.004 ether, "RISE token totalPendingFees is invalid"); // 4x mint of 1 WETH
+        assertEq(vault.getOutstandingDebt(riseTokenAddress), 16363481988, "Borrow amount is invalid"); // 4 times borrow with WETH price around 4000
+        assertEq(vault.getTotalAvailableCash(), 83636518012, "Total available cash is invalid"); // 100K - (total borrow + collected fees)
     }
 
     // Test Redeem
