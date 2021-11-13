@@ -59,7 +59,7 @@ contract RiseTokenVault is RisedleVault {
      * @return The address of the new RISE token
      */
     function create(
-        string memory name, // The name of the RISE token (e.g. ETH 2x Leverage Risedle)
+        string memory name, // The name of the RISE token (e.g. ETH 2x Long Risedle)
         string memory symbol, // The symbol of the RISE token (e.g. ETHRISE)
         address collateral, // The underlying token of RISE token (e.g. WETH)
         address oracle, // Contract address that implement IRisedleOracle interface
