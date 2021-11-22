@@ -213,6 +213,147 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getTotalAvailableCash(), 83636518012, "Total available cash is invalid"); // 100K - (total borrow + collected fees)
     }
 
+    /// @notice Scenario 1: User mint token below the NAV price
+    function test_MintRISETokenBelowNAVPrice() public {
+        // Update the contract balance to 100K USDC
+        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new RISE token vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 0.5%
+        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
+        Swap swap = new Swap(slippage);
+
+        // Fund the swap contract
+        hevm.setWETHBalance(address(swap), 100 ether);
+
+        // Create new RISE token as owner
+        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        address riseTokenAddress = vault.create("ETH 2x Long Risedle", "ETHRISE", WETH_ADDRESS, address(oracle), address(swap), initialPrice, feeInEther);
+
+        // Create new dummy user
+        Investor investor = new Investor(vault);
+
+        // Set the investor WETH balance
+        uint256 depositAmount = 0.0225 ether;
+        hevm.setWETHBalance(address(investor), depositAmount);
+
+        // Set the price oracle
+        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the token
+        investor.mint(riseTokenAddress, depositAmount);
+
+        // Check the collateral per RISE token and debt per RISE token
+        assertEq(vault.getCollateralPerRiseToken(riseTokenAddress), 50246181139343977); // Should be 0.05 ether but due to slippage it got less amount of RISE token, hence the mint amount is less
+        assertEq(vault.getDebtPerRiseToken(riseTokenAddress), 100984724); // Should be $100 but due to slippage, the borrow amount is larger, hence the mint amount is less
+    }
+
+    /// @notice Scenario 2: User mint token equal to the NAV price
+    function test_MintRISETokenEqualNAVPrice() public {
+        // Update the contract balance to 100K USDC
+        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new RISE token vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 0.5%
+        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
+        Swap swap = new Swap(slippage);
+
+        // Fund the swap contract
+        hevm.setWETHBalance(address(swap), 100 ether);
+
+        // Create new RISE token as owner
+        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        address riseTokenAddress = vault.create("ETH 2x Long Risedle", "ETHRISE", WETH_ADDRESS, address(oracle), address(swap), initialPrice, feeInEther);
+
+        // Create new dummy user
+        Investor investor = new Investor(vault);
+
+        // Set the investor WETH balance
+        uint256 depositAmount = 0.0250 ether;
+        hevm.setWETHBalance(address(investor), depositAmount);
+
+        // Set the price oracle
+        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the token
+        investor.mint(riseTokenAddress, depositAmount);
+
+        // Check the collateral per RISE token and debt per RISE token
+        assertEq(vault.getCollateralPerRiseToken(riseTokenAddress), 50246181139343977);
+        assertEq(vault.getDebtPerRiseToken(riseTokenAddress), 100984724);
+    }
+
+    /// @notice Scenario 3: User mint token above to the NAV price
+    function test_MintRISETokenAboveNAVPrice() public {
+        // Update the contract balance to 100K USDC
+        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new RISE token vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 0.5%
+        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
+        Swap swap = new Swap(slippage);
+
+        // Fund the swap contract
+        hevm.setWETHBalance(address(swap), 100 ether);
+
+        // Create new RISE token as owner
+        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        address riseTokenAddress = vault.create("ETH 2x Long Risedle", "ETHRISE", WETH_ADDRESS, address(oracle), address(swap), initialPrice, feeInEther);
+
+        // Create new dummy user
+        Investor investor = new Investor(vault);
+
+        // Set the investor WETH balance
+        uint256 depositAmount = 0.0375 ether;
+        hevm.setWETHBalance(address(investor), depositAmount);
+
+        // Set the price oracle
+        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the token
+        investor.mint(riseTokenAddress, depositAmount);
+
+        // Check the collateral per RISE token and debt per RISE token
+        assertEq(vault.getCollateralPerRiseToken(riseTokenAddress), 50246181139343977);
+        assertEq(vault.getDebtPerRiseToken(riseTokenAddress), 100984724);
+    }
+
     // Test Redeem
     // mint, no price change, then redeem, User should receive their collateral back minus 0.2% fee
     // mint, price go up, then redeem, User should receive their collateral back plus their profit
