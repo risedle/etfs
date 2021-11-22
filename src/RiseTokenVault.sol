@@ -117,6 +117,22 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
+     * @notice getCollateralPerRiseToken returns the collateral shares per RISE token
+     * @return collateralPerRiseToken The amount of collateral per RISE token (e.g. 0.5 ETH is 0.5*1e18)
+     */
+    function getCollateralPerRiseToken(address token) external view returns (uint256 collateralPerRiseToken) {
+        // Make sure the RISE token is exists
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        if (riseTokenMetadata.feeInEther == 0) return 0;
+
+        // Get collateral per RISE token and debt per RISE token
+        uint256 riseTokenSupply = IERC20(riseTokenMetadata.token).totalSupply();
+        uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.token).decimals();
+
+        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+    }
+
+    /**
      * @notice getDebtPerRiseToken returns the debt shares per RISE token
      * @return debtPerRiseToken The amount of debt per RISE token (e.g. 80 USDC is 80*1e6)
      */
@@ -133,6 +149,20 @@ contract RiseTokenVault is RisedleVault {
 
         // Get debt per RISE token
         debtPerRiseToken = (totalDebt * (10**collateralDecimals)) / totalSupply;
+    }
+
+    /**
+     * @notice getDebtPerRiseToken returns the debt shares per RISE token
+     * @return debtPerRiseToken The amount of debt per RISE token (e.g. 80 USDC is 80*1e6)
+     */
+    function getDebtPerRiseToken(address token) external view returns (uint256 debtPerRiseToken) {
+        // Make sure the RISE token is exists
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        if (riseTokenMetadata.feeInEther == 0) return 0;
+
+        uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
+        uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.token).decimals();
+        debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
     }
 
     /**
