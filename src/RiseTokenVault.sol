@@ -33,11 +33,10 @@ contract RiseTokenVault is RisedleVault {
         uint256 feeInEther; // Creation and redemption fee in ether units (e.g. 0.1% is 0.001 ether)
         uint256 totalCollateral; // Total amount of underlying managed by this ETF
         uint256 totalPendingFees; // Total amount of creation and redemption pending fees in ETF underlying
-        uint256 lastRebalancingTimestamp; // The timestamp where the last rebalancing happen
-        uint256 targetLeverageRatioInEther; // Target leverage ratio in ether units (e.g. 2x is 2 ether = 2*1e18)
-        uint256 dailyRebalancingStepInEther; // Daily rebalancing step in ether units (e.g. 0.1 is 0.1*1e18 or 1e17)
-        uint256 maxRebalancingValue; // The maximum value of buy/sell when rebalancing (e.g. 250K USDC is 250000 * 1e6)
-        bool isPartialRebalancingInProgress; // Set to True if the partial rebalancing happen
+        uint256 minLeverageRatioInEther; // Minimum leverage ratio in ether units (e.g. 2x is 2 ether = 2*1e18)
+        uint256 maxLeverageRatioInEther; // Maximum leverage ratio  in ether units (e.g. 3x is 3 ether = 3*1e18)
+        uint256 maxRebalancingValue; // The maximum value of buy/sell when rebalancing (e.g. 500K USDC is 500000 * 1e6)
+        uint256 rebalancingStepInEther; // The rebalancing step in ether units (e.g. 0.2 is 0.2 ether or 0.2 * 1e18)
     }
 
     /// @notice Mapping TOKENRISE to their metadata
@@ -50,7 +49,7 @@ contract RiseTokenVault is RisedleVault {
     event RiseTokenMinted(address indexed user, address indexed riseToken, uint256 mintedAmount);
 
     /// @notice Event emitted when TOKENRISE is successfully rebalanced
-    event DailyRebalancing(address indexed executor, uint256 previousLeverageRatioInEther);
+    event RiseTokenRebalanced(address indexed executor, uint256 previousLeverageRatioInEther);
 
     /**
      * @notice Construct new RiseTokenVault
@@ -373,24 +372,16 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
-     * @notice Run daily rebalance
+     * @notice Run the rebalancing
      * @param token The TOKENRISE address
      */
-    function dailyRebalance(address token) external nonReentrant {
+    function rebalance(address token) external nonReentrant {
         // Accrue interest
         accrueInterest();
 
         // Make sure the TOKENRISE is exists
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE");
-
-        // Return early if current timestamp is not more than 24 hours and is not a partial rebalancing
-        if ((block.timestamp < riseTokenMetadata.lastRebalancingTimestamp + 86400) && !riseTokenMetadata.isPartialRebalancingInProgress) {
-            return;
-        }
-
-        // Set the latest rebalancing timestamp
-        riseTokens[riseTokenMetadata.token].lastRebalancingTimestamp = block.timestamp;
 
         // Otherwise get the current leverage ratio
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
@@ -401,22 +392,22 @@ contract RiseTokenVault is RisedleVault {
         uint256 leverageRatioInEther = calculateLeverageRatio(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
         uint256 nav = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
 
-        // Leveraging up when: leverage ratio <= target leverage - daily rebalancing step
+        // Revert if the leverage ratio is in range
+        require(leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther || leverageRatioInEther > riseTokenMetdata.maxLeverageRatioInEther, "!LRIR"); // Leverage ratio in range
+
+        // Calculate the borrow or repay amount
+        uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * nav * totalSupply) / 1 ether;
+        uint256 collateralAmount = (borrowOrRepayAmount * (10**collateralDecimals)) / collateralPrice;
+
+        // Leveraging up when: leverage ratio < min leverage ratio
         // 1. Borrow more USDC
         // 2. Swap USDC to collateral token
-        if (leverageRatioInEther <= riseTokenMetadata.targetLeverageRatioInEther - riseTokenMetadata.dailyRebalancingStepInEther) {
-            uint256 borrowAmount = (riseTokenMetadata.dailyRebalancingStepInEther * nav * totalSupply) / 1 ether;
-            uint256 collateralAmount = (borrowAmount * (10**collateralDecimals)) / collateralPrice;
+        if (leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther) {
             uint256 maximumCollateralPrice = collateralPrice + ((0.01 ether * collateralPrice) / 1 ether);
             // Maximum plus +1% from the oracle price
             uint256 maxBorrowAmount = (collateralAmount * maximumCollateralPrice) / (10**collateralDecimals);
             if (maxBorrowAmount > riseTokenMetadata.maxRebalancingValue) {
                 maxBorrowAmount = riseTokenMetadata.maxRebalancingValue;
-                // Set partial rebalancing to true
-                riseTokens[riseTokenMetadata.token].isPartialRebalancingInProgress = true;
-            } else {
-                // Set partial rebalancing to false
-                riseTokens[riseTokenMetadata.token].isPartialRebalancingInProgress = false;
             }
 
             // Swap USDC to collateral
@@ -429,21 +420,14 @@ contract RiseTokenVault is RisedleVault {
             riseTokens[riseTokenMetadata.token].totalCollateral += collateralAmount;
         }
 
-        // Leveraging down when: leverage ratio >= target leverage + rebalancing step
+        // Leveraging down when: leverage ratio > max leverage ratio
         // 1. Swap collateral to USDC
         // 2. Repay the debt
-        if (leverageRatioInEther >= riseTokenMetadata.targetLeverageRatioInEther + riseTokenMetadata.dailyRebalancingStepInEther) {
-            uint256 repayAmount = (riseTokenMetadata.dailyRebalancingStepInEther * nav * totalSupply) / 1 ether;
-            uint256 collateralAmount = (repayAmount * (10**collateralDecimals)) / collateralPrice;
+        if (leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther) {
             uint256 minimumCollateralPrice = collateralPrice - ((0.01 ether * collateralPrice) / 1 ether);
             uint256 maxCollateralAmount = (collateralAmount * minimumCollateralPrice) / (10**collateralDecimals);
             if (repayAmount > riseTokenMetadata.maxRebalancingValue) {
                 repayAmount = riseTokenMetadata.maxRebalancingValue;
-                // Set partial rebalancing to true
-                riseTokens[riseTokenMetadata.token].isPartialRebalancingInProgress = true;
-            } else {
-                // Set partial rebalancing to false
-                riseTokens[riseTokenMetadata.token].isPartialRebalancingInProgress = false;
             }
 
             // Collateral to USDC
@@ -456,6 +440,6 @@ contract RiseTokenVault is RisedleVault {
             riseTokens[riseTokenMetadata.token].totalCollateral -= collateralSoldAmount;
         }
 
-        emit DailyRebalancing(msg.sender, leverageRatioInEther);
+        emit RiseTokenRebalanced(msg.sender, leverageRatioInEther);
     }
 }
