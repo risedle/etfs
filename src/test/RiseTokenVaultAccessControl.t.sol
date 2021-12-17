@@ -39,15 +39,18 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
         address riseTokenAddress = address(ethrise);
         vault.create(
+            true,
             riseTokenAddress,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             uniswapV3Swapper,
-            100 * 1e6, // 100 USDC
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
             0.001 ether, // creation and redemption fees is 0.1%
-            2 ether, // Target leverage is 2x
-            0.1 ether, // Daily rebalancing step is 0.1x
-            250000 * 1e6 // Max value of sell/buy is 250K USDC
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.2 ether // Rebalancing step is 0.2x
         );
     }
 
@@ -63,15 +66,18 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
         address riseTokenAddress = address(ethrise);
         vault.create(
+            true,
             riseTokenAddress,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             uniswapV3Swapper,
-            100 * 1e6, // 100 USDC
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
             0.001 ether, // creation and redemption fees is 0.1%
-            2 ether, // Target leverage is 2x
-            0.1 ether, // Daily rebalancing step is 0.1x
-            250000 * 1e6 // Max value of sell/buy is 250K USDC
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
         );
 
         // Validate the ERC20 of the RISE token
@@ -81,12 +87,18 @@ contract RiseTokenVaultAccessControlTest is DSTest {
 
         // Validate the metadata of the RISE token
         RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(riseTokenAddress);
+        assertEq(riseTokenMetadata.isETH, true);
         assertEq(riseTokenMetadata.token, riseTokenAddress);
         assertEq(riseTokenMetadata.collateral, WETH_ADDRESS);
-        assertEq(riseTokenMetadata.oracle, CHAINLINK_ETH_USD);
-        assertEq(riseTokenMetadata.swap, uniswapV3Swapper);
+        assertEq(riseTokenMetadata.oracleContract, CHAINLINK_ETH_USD);
+        assertEq(riseTokenMetadata.swapContract, uniswapV3Swapper);
+        assertEq(riseTokenMetadata.maxSwapSlippageInEther, 0.05 ether); // max slippage is 5%
         assertEq(riseTokenMetadata.initialPrice, 100 * 1e6); // 100 USDC
         assertEq(riseTokenMetadata.feeInEther, 0.001 ether); // 0.1%
+        assertEq(riseTokenMetadata.minLeverageRatioInEther, 1.7 ether);
+        assertEq(riseTokenMetadata.maxLeverageRatioInEther, 2.3 ether);
+        assertEq(riseTokenMetadata.maxRebalancingValue, 500000 * 1e6); // 500K USDC
+        assertEq(riseTokenMetadata.rebalancingStepInEther, 0.2 ether); // Rebalancing step
         assertEq(riseTokenMetadata.totalCollateral, 0);
         assertEq(riseTokenMetadata.totalPendingFees, 0);
     }
@@ -103,15 +115,18 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
         address riseTokenAddress = address(ethrise);
         vault.create(
+            true,
             riseTokenAddress,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             uniswapV3Swapper,
-            100 * 1e6, // 100 USDC
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
             0.001 ether, // creation and redemption fees is 0.1%
-            2 ether, // Target leverage is 2x
-            0.1 ether, // Daily rebalancing step is 0.1x
-            250000 * 1e6 // Max value of sell/buy is 250K USDC
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
         );
 
         // Event the vault's owner cannot mint the RISE token
@@ -133,16 +148,20 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
         address riseTokenAddress = address(ethrise);
         vault.create(
+            true,
             riseTokenAddress,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
             uniswapV3Swapper,
-            100 * 1e6, // 100 USDC
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
             0.001 ether, // creation and redemption fees is 0.1%
-            2 ether, // Target leverage is 2x
-            0.1 ether, // Daily rebalancing step is 0.1x
-            250000 * 1e6 // Max value of sell/buy is 250K USDC
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
         );
+
         // Event the vault's owner cannot burn the RISE token
         address burnFrom = hevm.addr(2);
         IRisedleERC20(riseTokenAddress).burn(burnFrom, 1 ether); // Should be failed
