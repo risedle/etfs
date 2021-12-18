@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Risedle WETH9 Implementation
 // The deployer will get 1_000_000 WETH by default
 // The initial minted token will be used as initial liquidity on uniswap
@@ -16,10 +18,12 @@ contract WETH9 {
 
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    uint256 internal totalMinted = 0;
 
     constructor() {
         // Set the deployer balance to 1_000_000 WETH
         balanceOf[msg.sender] = 1_000_000 ether;
+        totalMinted += 1_000_000 ether;
         emit Transfer(address(this), msg.sender, 1_000_000 ether);
     }
 
@@ -29,18 +33,20 @@ contract WETH9 {
 
     function deposit() public payable {
         balanceOf[msg.sender] += msg.value;
+        totalMinted += msg.value;
         emit Deposit(msg.sender, msg.value);
     }
 
     function withdraw(uint256 wad) public {
         require(balanceOf[msg.sender] >= wad);
         balanceOf[msg.sender] -= wad;
+        totalMinted -= wad;
         payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
     }
 
     function totalSupply() public view returns (uint256) {
-        return address(this).balance;
+        return totalMinted;
     }
 
     function approve(address guy, uint256 wad) public returns (bool) {
