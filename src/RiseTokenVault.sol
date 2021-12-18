@@ -25,10 +25,12 @@ contract RiseTokenVault is RisedleVault {
 
     /// @notice RiseTokenMetadata contains the metadata of TOKENRISE
     struct RiseTokenMetadata {
+        bool isETH; // True if the collateral is eth
         address token; // Address of ETF token ERC20, make sure this vault can mint & burn this token
         address collateral; // ETF underlying asset (e.g. WETH address)
-        address oracle; // Contract address that implement IRisedleOracle interface
-        address swap; // Contract address that implment IRisedleSwap interface
+        address oracleContract; // Contract address that implement IRisedleOracle interface
+        address swapContract; // Contract address that implment IRisedleSwap interface
+        uint256 maxSwapSlippageInEther; // Maximum swap slippage for mint, redeem and rebalancing (e.g. 1% is 0.01 ether or 0.01 * 1e18)
         uint256 initialPrice; // In term of vault's underlying asset (e.g. 100 USDC -> 100 * 1e6, coz is 6 decimals for USDC)
         uint256 feeInEther; // Creation and redemption fee in ether units (e.g. 0.1% is 0.001 ether)
         uint256 totalCollateral; // Total amount of underlying managed by this ETF
@@ -65,35 +67,36 @@ contract RiseTokenVault is RisedleVault {
      * @dev Only admin can call this function
      */
     function create(
+        bool isETH, // True if the collateral is ETH
         address tokenRiseAddress, // ERC20 token address that only RiseTokenVault can mint and burn
-        address collateral, // The underlying token of TOKENRISE (e.g. WETH)
+        address collateral, // The underlying token of TOKENRISE (e.g. WBTC), it's WETH if the isETH is true
         address oracleContract, // Contract address that implement IRisedleOracle interface
         address swapContract, // Uniswap V3 like token swapper
+        uint256 maxSwapSlippageInEther, // Maximum slippage when mint, redeem and rebalancing (1% is 0.01 ether or 0.01*1e18)
         uint256 initialPrice, // Initial price of the TOKENRISE based on the Vault's underlying asset (e.g. 100 USDC => 100 * 1e6)
         uint256 feeInEther, // Creation and redemption fee in ether units (e.g. 0.001 ether = 0.1%)
-        uint256 targetLeverageRatioInETher, // Target leverage ratio in ether units 2x is 2 ether or 2*1e18
-        uint256 dailyRebalancingStepInEther, // Daily rebalancing step 0.1x is 0.1 ether or 0.1*1e18 or 1e17
-        uint256 maxRebalancingValue // The maximum amount of buy and sell for each rebalance (e.g. 250K USDC is 250000 * 1e6)
+        uint256 minLeverageRatioInEther, // Minimum leverage ratio in ether units (e.g. 2x is 2 ether = 2*1e18)
+        uint256 maxLeverageRatioInEther, // Maximum leverage ratio  in ether units (e.g. 3x is 3 ether = 3*1e18)
+        uint256 maxRebalancingValue, // The maximum value of buy/sell when rebalancing (e.g. 500K USDC is 500000 * 1e6)
+        uint256 rebalancingStepInEther // The rebalancing step in ether units (e.g. 0.2 is 0.2 ether or 0.2 * 1e18)
     ) external onlyOwner {
-        // Get collateral decimals
-        uint8 collateralDecimals = IERC20Metadata(collateral).decimals();
-
         // Create new Rise metadata
-        RiseTokenMetadata memory riseTokenMetadata = RiseTokenMetadata(
-            tokenRiseAddress,
-            collateral,
-            oracleContract,
-            swapContract,
-            initialPrice,
-            feeInEther,
-            0, // Set totalCollateral to zero
-            0, // Set totalPendingFees to zero
-            block.timestamp, // Set last rebalancing timestamp to current timestamp
-            targetLeverageRatioInETher, // Target leverage ratio in ether units
-            dailyRebalancingStepInEther, // Daily rebalancing step
-            maxRebalancingValue, // Max value of sell/buy per rebalancing
-            false
-        );
+        RiseTokenMetadata memory riseTokenMetadata = RiseTokenMetadata({
+            isETH: isETH,
+            token: tokenRiseAddress,
+            collateral: collateral,
+            oracleContract: oracleContract,
+            swapContract: swapContract,
+            maxSwapSlippageInEther: maxSwapSlippageInEther,
+            initialPrice: initialPrice,
+            feeInEther: feeInEther,
+            minLeverageRatioInEther: minLeverageRatioInEther,
+            maxLeverageRatioInEther: maxLeverageRatioInEther,
+            maxRebalancingValue: maxRebalancingValue,
+            rebalancingStepInEther: rebalancingStepInEther,
+            totalCollateral: 0,
+            totalPendingFees: 0
+        });
 
         // Map new info to their token
         riseTokens[tokenRiseAddress] = riseTokenMetadata;
@@ -209,7 +212,7 @@ contract RiseTokenVault is RisedleVault {
 
         // Get the current price of the TOKENRISE collateral in term of vault's underlying token
         // For example WETH/USDC would trading around 4000 USDC (4000 * 1e6)
-        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracle).getPrice();
+        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
 
         // Get collateral per TOKENRISE and debt per TOKENRISE
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
@@ -287,7 +290,7 @@ contract RiseTokenVault is RisedleVault {
      * @param token The address of TOKENRISE
      * @param amount The collateral amount
      */
-    function mint(address token, uint256 amount) external nonReentrant {
+    function mint(address token, uint256 amount) external payable nonReentrant {
         // Accrue interest
         accrueInterest();
 
@@ -300,7 +303,14 @@ contract RiseTokenVault is RisedleVault {
         uint256 nav = getNAV(token);
 
         // Transfer the collateral to the vault
-        IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
+        if (riseTokenMetadata.isETH) {
+            // Transfer eth from address to the contract
+            require(msg.value == amount, "!ENE"); // Send it eth not equal to input amount
+
+            // Wrapped it to the ETH using WETH contract
+        } else {
+            IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
+        }
 
         // Get the collateral and fee amount
         (uint256 collateralAmount, uint256 feeAmount) = getCollateralAndFeeAmount(amount, riseTokenMetadata.feeInEther);
@@ -310,11 +320,11 @@ contract RiseTokenVault is RisedleVault {
         riseTokens[riseTokenMetadata.token].totalPendingFees += feeAmount;
 
         // Get the current price of collateral in term of vault underlying asset
-        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracle).getPrice();
+        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
 
         // Get the borrow amount
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
-        uint256 borrowAmount = borrowAndSwap(riseTokenMetadata.swap, riseTokenMetadata.collateral, collateralAmount, collateralPrice, collateralDecimals);
+        uint256 borrowAmount = borrowAndSwap(riseTokenMetadata.swapContract, riseTokenMetadata.collateral, collateralAmount, collateralPrice, collateralDecimals);
 
         // Set TOKENRISE debt states
         setBorrowStates(token, borrowAmount);
@@ -385,7 +395,7 @@ contract RiseTokenVault is RisedleVault {
 
         // Otherwise get the current leverage ratio
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
-        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracle).getPrice();
+        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
         uint256 collateralPerRiseToken = getCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
         uint256 debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
@@ -393,7 +403,7 @@ contract RiseTokenVault is RisedleVault {
         uint256 nav = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
 
         // Revert if the leverage ratio is in range
-        require(leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther || leverageRatioInEther > riseTokenMetdata.maxLeverageRatioInEther, "!LRIR"); // Leverage ratio in range
+        require(leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther || leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther, "!LRIR"); // Leverage ratio in range
 
         // Calculate the borrow or repay amount
         uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * nav * totalSupply) / 1 ether;
@@ -411,7 +421,7 @@ contract RiseTokenVault is RisedleVault {
             }
 
             // Swap USDC to collateral
-            uint256 borrowedAmount = swap(riseTokenMetadata.swap, underlyingToken, riseTokenMetadata.collateral, maxBorrowAmount, collateralAmount);
+            uint256 borrowedAmount = swap(riseTokenMetadata.swapContract, underlyingToken, riseTokenMetadata.collateral, maxBorrowAmount, collateralAmount);
 
             // Update the borrow states
             setBorrowStates(token, borrowedAmount);
@@ -426,15 +436,15 @@ contract RiseTokenVault is RisedleVault {
         if (leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther) {
             uint256 minimumCollateralPrice = collateralPrice - ((0.01 ether * collateralPrice) / 1 ether);
             uint256 maxCollateralAmount = (collateralAmount * minimumCollateralPrice) / (10**collateralDecimals);
-            if (repayAmount > riseTokenMetadata.maxRebalancingValue) {
-                repayAmount = riseTokenMetadata.maxRebalancingValue;
+            if (borrowOrRepayAmount > riseTokenMetadata.maxRebalancingValue) {
+                borrowOrRepayAmount = riseTokenMetadata.maxRebalancingValue;
             }
 
             // Collateral to USDC
-            uint256 collateralSoldAmount = swap(riseTokenMetadata.swap, riseTokenMetadata.collateral, underlyingToken, maxCollateralAmount, repayAmount);
+            uint256 collateralSoldAmount = swap(riseTokenMetadata.swapContract, riseTokenMetadata.collateral, underlyingToken, maxCollateralAmount, borrowOrRepayAmount);
 
             // Repay the debts
-            setRepayStates(token, repayAmount);
+            setRepayStates(token, borrowOrRepayAmount);
 
             // Update the total collateral
             riseTokens[riseTokenMetadata.token].totalCollateral -= collateralSoldAmount;
