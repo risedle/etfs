@@ -346,6 +346,9 @@ contract RiseTokenVault is RisedleVault {
         // Make sure the TOKENRISE is ETH enabled
         require(riseTokenMetadata.isETH, "!TRNE"); // TOKENRISE is not ETH enabled
 
+        // Make sure the ETH amount is larger than zero
+        require(msg.value > 0, "!EIZ"); // ETH is zero
+
         // Wrap the ETH to WETH
         IWETH9(riseTokenMetadata.collateral).deposit{ value: msg.value }();
 
