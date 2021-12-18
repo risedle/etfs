@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
 
-import { USDC_ADDRESS, USDC_SLOT, USDT_ADDRESS, USDT_SLOT, WETH_ADDRESS, WETH_SLOT } from "chain/Constants.sol";
+import { USDC_ADDRESS, USDC_SLOT, USDT_ADDRESS, USDT_SLOT, WETH_ADDRESS, WETH_SLOT, UNI_ADDRESS, UNI_SLOT } from "chain/Constants.sol";
 
 /// @notice Set Hevm interface, so we can use the cheat codes it in the test
 /// @dev https://github.com/dapphub/dapptools/tree/master/src/hevm#cheat-codes
@@ -46,5 +46,9 @@ contract Hevm {
 
     function setWETHBalance(address account, uint256 amount) public {
         hevm.store(WETH_ADDRESS, keccak256(abi.encode(account, WETH_SLOT)), bytes32(amount));
+    }
+
+    function setUNIBalance(address account, uint256 amount) public {
+        hevm.store(UNI_ADDRESS, keccak256(abi.encode(account, UNI_SLOT)), bytes32(amount));
     }
 }
