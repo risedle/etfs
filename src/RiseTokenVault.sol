@@ -19,6 +19,7 @@ import { RisedleERC20 } from "./tokens/RisedleERC20.sol";
 import { IRisedleOracle } from "./interfaces/IRisedleOracle.sol";
 import { IRisedleSwap } from "./interfaces/IRisedleSwap.sol";
 import { IRisedleERC20 } from "./interfaces/IRisedleERC20.sol";
+import { IWETH9 } from "./interfaces/IWETH9.sol";
 
 contract RiseTokenVault is RisedleVault {
     using SafeERC20 for IERC20;
@@ -290,7 +291,7 @@ contract RiseTokenVault is RisedleVault {
      * @param token The address of TOKENRISE
      * @param amount The collateral amount
      */
-    function mint(address token, uint256 amount) external payable nonReentrant {
+    function mint(address token, uint256 amount) public nonReentrant {
         // Accrue interest
         accrueInterest();
 
@@ -302,15 +303,8 @@ contract RiseTokenVault is RisedleVault {
         // For example, If ETHRISE nav is 200 USDC, it will returns 200 * 1e6
         uint256 nav = getNAV(token);
 
-        // Transfer the collateral to the vault
-        if (riseTokenMetadata.isETH) {
-            // Transfer eth from address to the contract
-            require(msg.value == amount, "!ENE"); // Send it eth not equal to input amount
-
-            // Wrapped it to the ETH using WETH contract
-        } else {
-            IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
-        }
+        // Transfer ERC20 collateral to the contract
+        IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
 
         // Get the collateral and fee amount
         (uint256 collateralAmount, uint256 feeAmount) = getCollateralAndFeeAmount(amount, riseTokenMetadata.feeInEther);
@@ -337,6 +331,26 @@ contract RiseTokenVault is RisedleVault {
 
         // Emit the event
         emit RiseTokenMinted(msg.sender, token, mintedAmount);
+    }
+
+    /**
+     * @notice Mint new ETHRISE. The ETH will automatically wrapped to WETH first
+     * @dev The transaction will revert if the TOKENRISE is not ETH leveraged token
+     * @param token The address of TOKENRISE
+     */
+    function mint(address token) external payable nonReentrant {
+        // Make sure the TOKENRISE is exists
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        require(riseTokenMetadata.feeInEther > 0, "!RTNE");
+
+        // Make sure the TOKENRISE is ETH enabled
+        require(riseTokenMetadata.isETH, "!TRNE"); // TOKENRISE is not ETH enabled
+
+        // Wrap the ETH to WETH
+        IWETH9(riseTokenMetadata.collateral).deposit{ value: msg.value }();
+
+        // Mint the ETHRISE token
+        mint(token, msg.value);
     }
 
     /**

@@ -15,7 +15,7 @@ import { Hevm } from "./Hevm.sol";
 import { RiseTokenVault } from "../RiseTokenVault.sol";
 import { RisedleERC20 } from "../tokens/RisedleERC20.sol";
 
-import { USDC_ADDRESS, WETH_ADDRESS } from "chain/Constants.sol";
+import { USDC_ADDRESS, WETH_ADDRESS, UNI_ADDRESS } from "chain/Constants.sol";
 
 /// @notice Dummy oracle contract that implement IRisedleOracle interface used for testing
 contract Oracle {
@@ -73,7 +73,13 @@ contract Investor {
         _vault = vault;
     }
 
-    function mint(address token, uint256 collateralAmount) public {
+    /// @notice Mint TOKENRISE using ETH
+    function mintWithETH(address token) public payable {
+        // Mint TOKENRISE using ETH
+        _vault.mint{ value: msg.value }(token);
+    }
+
+    function mintWithERC20(address token, uint256 collateralAmount) public {
         // Approve to spend the collateral token
         address collateralToken = _vault.getMetadata(token).collateral;
         IERC20(collateralToken).safeApprove(address(_vault), collateralAmount);
@@ -86,7 +92,8 @@ contract Investor {
     }
 }
 
-/// @notice External test
+/// @title RiseTokenVault External test
+/// @author bayu (github.com/pyk)
 contract RiseTokenVaultExternalTest is DSTest {
     using SafeERC20 for IERC20;
     Hevm hevm;
@@ -96,20 +103,74 @@ contract RiseTokenVaultExternalTest is DSTest {
         hevm = new Hevm();
     }
 
-    // Test RISE token minting process
-    // 1. User should receive RISE token worth more than their collateral value minus 0.1% fee and 1% (max slippage) and less than their collateral value
+    // Test TOKENRISE minting process
+    // 1. User should receive TOKENRISE worth more than their collateral value minus 0.1% fee and 1% (max slippage) and less than their collateral value
     // 2. Subsquent minting:
-    //    If price is same, nav same, user should receive equal amount of RISE token
-    //    If price is up, nav up, user should receive less RISE token
-    //    If price is down, nav down, user should receive more RISE token
+    //    If price is same, nav same, user should receive equal amount of TOKENRISE
+    //    If price is up, nav up, user should receive less TOKENRISE
+    //    If price is down, nav down, user should receive more TOKENRISE
 
-    /// @notice Make sure the RISE token minting process works correctly
-    function test_MintRiseToken() public {
+    /// @notice Make sure it fails when user tryin to mint ERC20RISE token with ETH
+    function testFail_UserCannotMintERC20RISEWithETH() public {
+        // Update the contract balance to 100K USDC; We use this to supply the vault
+        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 0.5%
+        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
+        Swap swap = new Swap(slippage);
+
+        // Fund the swap contract with ERC20
+        hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
+
+        // Create new UNIRISE
+        uint256 initialPrice = 10 * 1e6; // 10 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        RisedleERC20 unirise = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            address(oracle),
+            address(swap),
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            initialPrice, // Initial price
+            feeInEther, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Create new dummy user
+        Investor investor = new Investor(vault);
+
+        // Set the price oracle
+        uint256 collateralPrice = 15 * 1e6; // 15 USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the UNIRISE token with ETH, it should be failed
+        uint256 depositAmount = 1 ether;
+        investor.mintWithETH{ value: depositAmount }(address(unirise));
+    }
+
+    /// @notice Make sure the ETHRISE minting process works correctly
+    function test_MintETHRISE() public {
         // Update the contract balance to 100K USDC
         uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
         hevm.setUSDCBalance(address(this), vaultSupplyAmount);
 
-        // Create new RISE token vault first; by default the deployer is the owner
+        // Create new vault first; by default the deployer is the owner
         RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
 
         // Add supply to the vault
@@ -126,7 +187,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         // Fund the swap contract
         hevm.setWETHBalance(address(swap), 100 ether);
 
-        // Create new RISE token as owner
+        // Create new TOKENRISE  as owner
         uint256 initialPrice = 100 * 1e6; // 100 USDC
         uint256 feeInEther = 0.001 ether; // 0.1%
         // Create new ETHRISE token
@@ -149,16 +210,13 @@ contract RiseTokenVaultExternalTest is DSTest {
         // Create new dummy user
         Investor investor = new Investor(vault);
 
-        // Set the investor WETH balance
-        uint256 depositAmount = 1 ether;
-        hevm.setWETHBalance(address(investor), depositAmount);
-
         // Set the price oracle
         uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        investor.mint(address(ethrise), depositAmount);
+        uint256 depositAmount = 1 ether;
+        // investor.mint(address(ethrise), depositAmount);
 
         // Calculate the expected value
         // uint256 feeAmount = (0.001 ether * depositAmount) / 1 ether; // 0.1% fee
@@ -199,7 +257,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         // Second investor with same deposit amount should have the same amount of minted token
         Investor secondInvestor = new Investor(vault);
         hevm.setWETHBalance(address(secondInvestor), depositAmount);
-        secondInvestor.mint(address(ethrise), depositAmount);
+        // secondInvestor.mint(address(ethrise), depositAmount);
         riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(secondInvestor));
         assertEq(riseTokenBalance, 39764215980000000000, "2: Wrong balance");
         assertEq((riseTokenBalance * initialPrice) / 1 ether, 3976421598, "2: RISE token worth value is not as described"); // Based on totalInvestment (fee and slippage)
@@ -209,7 +267,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getNAV(address(ethrise)), 110049236, "3: NAV invalid"); // ~110 USDC
         Investor thirdInvestor = new Investor(vault);
         hevm.setWETHBalance(address(thirdInvestor), depositAmount);
-        thirdInvestor.mint(address(ethrise), depositAmount);
+        // thirdInvestor.mint(address(ethrise), depositAmount);
         riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(thirdInvestor));
         assertEq(riseTokenBalance, 37939769777229530244, "3: Wrong RISE token balance");
 
@@ -218,7 +276,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getNAV(address(ethrise)), 104946579, "4: NAV invalid"); // ~104 USDC
         Investor forthInvestor = new Investor(vault);
         hevm.setWETHBalance(address(forthInvestor), depositAmount);
-        forthInvestor.mint(address(ethrise), depositAmount);
+        // forthInvestor.mint(address(ethrise), depositAmount);
         riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(forthInvestor));
         assertEq(riseTokenBalance, 38837208195228545753, "4: Wrong RISE token balance");
 
@@ -285,7 +343,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        investor.mint(address(ethrise), depositAmount);
+        // investor.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977); // Should be 0.05 ether but due to slippage it got less amount of RISE token, hence the mint amount is less
@@ -347,7 +405,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        investor.mint(address(ethrise), depositAmount);
+        // investor.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
@@ -409,7 +467,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        investor.mint(address(ethrise), depositAmount);
+        // investor.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
