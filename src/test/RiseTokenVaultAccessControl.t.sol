@@ -13,7 +13,7 @@ import { RiseTokenVault } from "../RiseTokenVault.sol";
 import { RisedleERC20 } from "../tokens/RisedleERC20.sol";
 import { IRisedleERC20 } from "../interfaces/IRisedleERC20.sol";
 
-import { USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_USDC_USD, CHAINLINK_ETH_USD } from "chain/Constants.sol";
+import { USDC_ADDRESS, WETH_ADDRESS, CHAINLINK_USDC_USD, CHAINLINK_ETH_USD, UNI_ADDRESS } from "chain/Constants.sol";
 
 contract RiseTokenVaultAccessControlTest is DSTest {
     Hevm hevm;
@@ -23,8 +23,8 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         hevm = new Hevm();
     }
 
-    /// @notice Make sure non-owner cannot create new RISE token
-    function testFail_NonOwnerCannotCreateNewRiseToken() public {
+    /// @notice Make sure non-owner cannot create new ETHRISE token
+    function testFail_NonOwnerCannotCreateNewETHRISEToken() public {
         // Create new vault; by default the deployer is the owner
         RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
 
@@ -43,6 +43,36 @@ contract RiseTokenVaultAccessControlTest is DSTest {
             riseTokenAddress,
             WETH_ADDRESS,
             CHAINLINK_ETH_USD,
+            uniswapV3Swapper,
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
+            0.001 ether, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+    }
+
+    /// @notice Make sure non-owner cannot create new ERC20RISE token
+    function testFail_NonOwnerCannotCreateNewERC20RISEToken() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Transfer the ownership
+        address newOwner = hevm.addr(1);
+        vault.transferOwnership(newOwner);
+
+        // Create dummy swapper address
+        address uniswapV3Swapper = hevm.addr(2);
+
+        // Create new ERC20RISE token as non-owner; should be failed
+        RisedleERC20 unirise = new RisedleERC20("UNI Leverage Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            CHAINLINK_ETH_USD, // For test only
             uniswapV3Swapper,
             0.05 ether, // Max 5% slippage for mint, redeem and rebalance
             100 * 1e6, // Initial price 100 USDC
