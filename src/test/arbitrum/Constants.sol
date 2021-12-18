@@ -22,6 +22,8 @@ address constant USDT_ADDRESS = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9;
 uint256 constant USDT_SLOT = 51;
 address constant WETH_ADDRESS = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
 uint256 constant WETH_SLOT = 51;
+address constant UNI_ADDRESS = 0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0;
+uint256 constant UNI_SLOT = 51;
 
 // Chainlink feeds
 address constant CHAINLINK_ETH_USD = 0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612;
