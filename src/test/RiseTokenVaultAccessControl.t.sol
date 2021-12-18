@@ -84,13 +84,14 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         );
     }
 
-    /// @notice Make sure owner can create new RISE token
-    function test_OwnerCanCreateNewRiseToken() public {
+    /// @notice Make sure owner can create new ETHRISE token
+    function test_OwnerCanCreateNewETHRISEToken() public {
         // Create new vault; by default the deployer is the owner
         RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
 
-        // Create dummy swapper address
-        address uniswapV3Swapper = hevm.addr(2);
+        // Create dummy contract
+        address dummyOracleContract = hevm.addr(2);
+        address dummySwapContract = hevm.addr(3);
 
         // Create new RISE token as owner
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
@@ -99,8 +100,8 @@ contract RiseTokenVaultAccessControlTest is DSTest {
             true,
             riseTokenAddress,
             WETH_ADDRESS,
-            CHAINLINK_ETH_USD,
-            uniswapV3Swapper,
+            dummyOracleContract,
+            dummySwapContract,
             0.05 ether, // Max 5% slippage for mint, redeem and rebalance
             100 * 1e6, // Initial price 100 USDC
             0.001 ether, // creation and redemption fees is 0.1%
@@ -111,7 +112,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         );
 
         // Validate the ERC20 of the RISE token
-        assertEq(IERC20Metadata(riseTokenAddress).name(), "ETH 2x Leverage Risedle");
+        assertEq(IERC20Metadata(riseTokenAddress).name(), "ETH 2x Long Risedle");
         assertEq(IERC20Metadata(riseTokenAddress).symbol(), "ETHRISE");
         assertEq(IERC20Metadata(riseTokenAddress).decimals(), IERC20Metadata(WETH_ADDRESS).decimals());
 
@@ -120,8 +121,57 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         assertEq(riseTokenMetadata.isETH, true);
         assertEq(riseTokenMetadata.token, riseTokenAddress);
         assertEq(riseTokenMetadata.collateral, WETH_ADDRESS);
-        assertEq(riseTokenMetadata.oracleContract, CHAINLINK_ETH_USD);
-        assertEq(riseTokenMetadata.swapContract, uniswapV3Swapper);
+        assertEq(riseTokenMetadata.oracleContract, dummyOracleContract);
+        assertEq(riseTokenMetadata.swapContract, dummySwapContract);
+        assertEq(riseTokenMetadata.maxSwapSlippageInEther, 0.05 ether); // max slippage is 5%
+        assertEq(riseTokenMetadata.initialPrice, 100 * 1e6); // 100 USDC
+        assertEq(riseTokenMetadata.feeInEther, 0.001 ether); // 0.1%
+        assertEq(riseTokenMetadata.minLeverageRatioInEther, 1.7 ether);
+        assertEq(riseTokenMetadata.maxLeverageRatioInEther, 2.3 ether);
+        assertEq(riseTokenMetadata.maxRebalancingValue, 500000 * 1e6); // 500K USDC
+        assertEq(riseTokenMetadata.rebalancingStepInEther, 0.2 ether); // Rebalancing step
+        assertEq(riseTokenMetadata.totalCollateral, 0);
+        assertEq(riseTokenMetadata.totalPendingFees, 0);
+    }
+
+    /// @notice Make sure owner can create new ETHRISE token
+    function test_OwnerCanCreateNewERC20RISEToken() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Create dummy contract
+        address dummyOracleContract = hevm.addr(2);
+        address dummySwapContract = hevm.addr(3);
+
+        // Create new RISE token as owner
+        RisedleERC20 unirise = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            dummyOracleContract,
+            dummySwapContract,
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
+            0.001 ether, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Validate the ERC20 of the RISE token
+        assertEq(IERC20Metadata(address(unirise)).name(), "UNI 2x Long Risedle");
+        assertEq(IERC20Metadata(address(unirise)).symbol(), "UNIRISE");
+        assertEq(IERC20Metadata(address(unirise)).decimals(), IERC20Metadata(UNI_ADDRESS).decimals());
+
+        // Validate the metadata of the RISE token
+        RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(address(unirise));
+        assertEq(riseTokenMetadata.isETH, false);
+        assertEq(riseTokenMetadata.token, address(unirise));
+        assertEq(riseTokenMetadata.collateral, UNI_ADDRESS);
+        assertEq(riseTokenMetadata.oracleContract, dummyOracleContract);
+        assertEq(riseTokenMetadata.swapContract, dummySwapContract);
         assertEq(riseTokenMetadata.maxSwapSlippageInEther, 0.05 ether); // max slippage is 5%
         assertEq(riseTokenMetadata.initialPrice, 100 * 1e6); // 100 USDC
         assertEq(riseTokenMetadata.feeInEther, 0.001 ether); // 0.1%
