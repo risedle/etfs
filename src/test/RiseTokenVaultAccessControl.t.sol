@@ -183,35 +183,17 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         assertEq(riseTokenMetadata.totalPendingFees, 0);
     }
 
-    /// @notice Make sure only vault can mint the RISE token
-    function testFail_NonRiseTokenVaultCannotMintRiseToken() public {
+    /// @notice Make sure only vault can mint the ETHRISE token
+    function testFail_NonRiseTokenVaultCannotMintRISEToken() public {
         // Create new vault; by default the deployer is the owner
         RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
 
-        // Create dummy swapper address
-        address uniswapV3Swapper = hevm.addr(1);
-
         // Create new RISE token as owner
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
-        address riseTokenAddress = address(ethrise);
-        vault.create(
-            true,
-            riseTokenAddress,
-            WETH_ADDRESS,
-            CHAINLINK_ETH_USD,
-            uniswapV3Swapper,
-            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
-            100 * 1e6, // Initial price 100 USDC
-            0.001 ether, // creation and redemption fees is 0.1%
-            1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
-            500000 * 1e6, // Max value of sell/buy is 500K USDC
-            0.2 ether // Rebalancing step is 0.2x
-        );
 
         // Event the vault's owner cannot mint the RISE token
         address mintTo = hevm.addr(2);
-        IRisedleERC20(riseTokenAddress).mint(mintTo, 1 ether); // Should be failed
+        IRisedleERC20(address(ethrise)).mint(mintTo, 1 ether); // Should be failed
     }
 
     /// @notice Make sure only vault can burn the RISE token
@@ -219,31 +201,11 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         // Create new vault; by default the deployer is the owner
         RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
 
-        // Create dummy swapper address
-        address uniswapV3Swapper = hevm.addr(1);
-
-        // Create new RISE token as owner
-
         // Create new ETHRISE token
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
-        address riseTokenAddress = address(ethrise);
-        vault.create(
-            true,
-            riseTokenAddress,
-            WETH_ADDRESS,
-            CHAINLINK_ETH_USD,
-            uniswapV3Swapper,
-            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
-            100 * 1e6, // Initial price 100 USDC
-            0.001 ether, // creation and redemption fees is 0.1%
-            1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
-            500000 * 1e6, // Max value of sell/buy is 500K USDC
-            0.2 ether // Rebalancing step is 0.2x
-        );
 
         // Event the vault's owner cannot burn the RISE token
         address burnFrom = hevm.addr(2);
-        IRisedleERC20(riseTokenAddress).burn(burnFrom, 1 ether); // Should be failed
+        IRisedleERC20(address(ethrise)).burn(burnFrom, 1 ether); // Should be failed
     }
 }
