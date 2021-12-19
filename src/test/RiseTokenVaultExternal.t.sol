@@ -15,6 +15,8 @@ import { Hevm } from "./Hevm.sol";
 import { RiseTokenVault } from "../RiseTokenVault.sol";
 import { RisedleERC20 } from "../tokens/RisedleERC20.sol";
 
+import { USDCToTokenSwap } from "../swaps/USDCToTokenSwap.sol";
+
 import { USDC_ADDRESS, WETH_ADDRESS, UNI_ADDRESS } from "chain/Constants.sol";
 
 /// @notice Dummy oracle contract that implement IRisedleOracle interface used for testing
@@ -34,37 +36,10 @@ contract Oracle {
     }
 }
 
-/// @notice Dummy swap contract that implement IRisedleSwap interface used for testing
-contract Swap {
-    using SafeERC20 for IERC20;
-    uint256 private slippageInEther;
-
-    constructor(uint256 slippage) {
-        slippageInEther = slippage;
-    }
-
-    function swap(
-        address tokenIn,
-        address tokenOut,
-        uint256 maxAmountIn,
-        uint256 amountOut
-    ) external returns (uint256 amountIn) {
-        // Transfer the specified amount of tokenIn to this contract.
-        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), maxAmountIn);
-
-        // Transfer the specified amount of tokenOut to the caller
-        IERC20(tokenOut).safeTransfer(msg.sender, amountOut);
-
-        // maxAmountIn is set to collateralPrice+1% by the contract
-        uint256 collateralPrice = maxAmountIn - ((0.01 ether * maxAmountIn) / 1 ether);
-        // Introduce 0.5% slippage
-        amountIn = collateralPrice + ((slippageInEther * collateralPrice) / 1 ether);
-        IERC20(tokenIn).safeTransfer(msg.sender, maxAmountIn - amountIn);
-    }
-}
-
-/// @notice Dummy user to mint/redeem the RISE token
-contract Investor {
+/// @title DummyUser
+/// @author bayu (github.com/pyk)
+/// @dev Contract to simulate user interactions
+contract DummyUser {
     using SafeERC20 for IERC20;
 
     RiseTokenVault private _vault;
@@ -128,7 +103,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract with ERC20
         hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
@@ -153,7 +128,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
         // Set the price oracle
         uint256 collateralPrice = 15 * 1e6; // 15 USDC
@@ -161,7 +136,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Mint the UNIRISE token with ETH, it should be failed
         uint256 depositAmount = 1 ether;
-        investor.mintWithETH{ value: depositAmount }(address(unirise));
+        user.mintWithETH{ value: depositAmount }(address(unirise));
     }
 
     /// @notice Make sure it fails when user trying to mint ETHRISE with zero ETH
@@ -182,7 +157,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract with WETH
         hevm.setWETHBalance(address(swap), 1_000 ether); // 1K WETH
@@ -207,7 +182,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
         // Set the price oracle
         uint256 collateralPrice = 4_000 * 1e6; // 4K USDC
@@ -215,7 +190,64 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Mint the ETHRISE token with zero ETH, it should be failed
         uint256 depositAmount = 0 ether;
-        investor.mintWithETH{ value: depositAmount }(address(ethrise));
+        user.mintWithETH{ value: depositAmount }(address(ethrise));
+    }
+
+    /// @notice Make sure it fails when user trying to mint and high slippage happen
+    function test_UserCannotMintERC20RISEWhenHighSlippage() public {
+        // Update the contract balance to 100K USDC; We use this to supply the vault
+        uint256 vaultSupplyAmount = 100_000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 10%
+        uint256 slippage = 0.1 ether; // 10% slippage to buy more collateral
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
+
+        // Fund the swap contract with UNI
+        hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
+
+        // Create new UNIRISE
+        uint256 initialPrice = 10 * 1e6; // 10 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        RisedleERC20 unirise = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            address(oracle),
+            address(swap),
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            initialPrice, // Initial price
+            feeInEther, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Create new dummy user
+        uint256 depositAmount = 10 ether; // 10 UNI token
+        DummyUser user = new DummyUser(vault);
+
+        // Fund the user
+        hevm.setUNIBalance(address(user), depositAmount);
+
+        // Set the price oracle
+        uint256 collateralPrice = 15 * 1e6; // 15 USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the UNIRISE; due to high slippage it should be failed
+        user.mintWithERC20(address(unirise), depositAmount);
     }
 
     /// @notice Make sure the ETHRISE minting process works correctly
@@ -236,7 +268,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract
         hevm.setWETHBalance(address(swap), 100 ether);
@@ -262,7 +294,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
         // Set the price oracle
         uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
@@ -270,7 +302,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Mint the token
         uint256 depositAmount = 1 ether;
-        // investor.mint(address(ethrise), depositAmount);
+        // user.mint(address(ethrise), depositAmount);
 
         // Calculate the expected value
         // uint256 feeAmount = (0.001 ether * depositAmount) / 1 ether; // 0.1% fee
@@ -284,12 +316,12 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Validate the expected values
         // RISE token should be transfered to the user
-        uint256 riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(investor));
+        uint256 riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(user));
         assertEq(riseTokenBalance, 39764215980000000000, "Wrong balance");
         assertEq((riseTokenBalance * initialPrice) / 1 ether, 3976421598, "RISE token worth value is not as described"); // Based on totalInvestment (fee and slippage)
 
         // The WETH token should be transfered to the RISE token vault
-        assertEq(IERC20(WETH_ADDRESS).balanceOf(address(investor)), 0, "Investor WETH balance is not transfered");
+        assertEq(IERC20(WETH_ADDRESS).balanceOf(address(user)), 0, "Investor WETH balance is not transfered");
         assertEq(IERC20(WETH_ADDRESS).balanceOf(address(vault)), 1999000000000000000, "Vault WETH balance is not updated"); // Deposit from user + swapped amount
 
         // Make sure the RISE token vault states is correct
@@ -308,30 +340,30 @@ contract RiseTokenVaultExternalTest is DSTest {
         // Make sure the NAV doesn't change
         assertEq(vault.getNAV(address(ethrise)), initialPrice);
 
-        // Second investor with same deposit amount should have the same amount of minted token
-        Investor secondInvestor = new Investor(vault);
-        hevm.setWETHBalance(address(secondInvestor), depositAmount);
-        // secondInvestor.mint(address(ethrise), depositAmount);
-        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(secondInvestor));
+        // Second user with same deposit amount should have the same amount of minted token
+        DummyUser secondUser = new DummyUser(vault);
+        hevm.setWETHBalance(address(secondUser), depositAmount);
+        // secondUser.mint(address(ethrise), depositAmount);
+        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(secondUser));
         assertEq(riseTokenBalance, 39764215980000000000, "2: Wrong balance");
         assertEq((riseTokenBalance * initialPrice) / 1 ether, 3976421598, "2: RISE token worth value is not as described"); // Based on totalInvestment (fee and slippage)
 
-        // Third investor, collateral price go up, nav go up, should receive less amount of ETHRISE token
+        // Third user, collateral price go up, nav go up, should receive less amount of ETHRISE token
         oracle.setPrice(4200 * 1e6);
         assertEq(vault.getNAV(address(ethrise)), 110049236, "3: NAV invalid"); // ~110 USDC
-        Investor thirdInvestor = new Investor(vault);
-        hevm.setWETHBalance(address(thirdInvestor), depositAmount);
-        // thirdInvestor.mint(address(ethrise), depositAmount);
-        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(thirdInvestor));
+        DummyUser thirdUser = new DummyUser(vault);
+        hevm.setWETHBalance(address(thirdUser), depositAmount);
+        // thirdUser.mint(address(ethrise), depositAmount);
+        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(thirdUser));
         assertEq(riseTokenBalance, 37939769777229530244, "3: Wrong RISE token balance");
 
-        // Fourth investor, collateral price go down, nav go down, should receive more amount of ETHRISE token
+        // Fourth user, collateral price go down, nav go down, should receive more amount of ETHRISE token
         oracle.setPrice(4100 * 1e6);
         assertEq(vault.getNAV(address(ethrise)), 104946579, "4: NAV invalid"); // ~104 USDC
-        Investor forthInvestor = new Investor(vault);
-        hevm.setWETHBalance(address(forthInvestor), depositAmount);
-        // forthInvestor.mint(address(ethrise), depositAmount);
-        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(forthInvestor));
+        DummyUser fourthUser = new DummyUser(vault);
+        hevm.setWETHBalance(address(fourthUser), depositAmount);
+        // fourthUser.mint(address(ethrise), depositAmount);
+        riseTokenBalance = IERC20(address(ethrise)).balanceOf(address(fourthUser));
         assertEq(riseTokenBalance, 38837208195228545753, "4: Wrong RISE token balance");
 
         // Validate the RISE token states
@@ -360,7 +392,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract
         hevm.setWETHBalance(address(swap), 100 ether);
@@ -386,18 +418,18 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
-        // Set the investor WETH balance
+        // Set the user WETH balance
         uint256 depositAmount = 0.0225 ether;
-        hevm.setWETHBalance(address(investor), depositAmount);
+        hevm.setWETHBalance(address(user), depositAmount);
 
         // Set the price oracle
         uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        // investor.mint(address(ethrise), depositAmount);
+        // user.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977); // Should be 0.05 ether but due to slippage it got less amount of RISE token, hence the mint amount is less
@@ -422,7 +454,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract
         hevm.setWETHBalance(address(swap), 100 ether);
@@ -448,18 +480,18 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
-        // Set the investor WETH balance
+        // Set the user WETH balance
         uint256 depositAmount = 0.0250 ether;
-        hevm.setWETHBalance(address(investor), depositAmount);
+        hevm.setWETHBalance(address(user), depositAmount);
 
         // Set the price oracle
         uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        // investor.mint(address(ethrise), depositAmount);
+        // user.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
@@ -484,7 +516,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Fund the swap contract
         hevm.setWETHBalance(address(swap), 100 ether);
@@ -510,18 +542,18 @@ contract RiseTokenVaultExternalTest is DSTest {
         );
 
         // Create new dummy user
-        Investor investor = new Investor(vault);
+        DummyUser user = new DummyUser(vault);
 
-        // Set the investor WETH balance
+        // Set the user WETH balance
         uint256 depositAmount = 0.0375 ether;
-        hevm.setWETHBalance(address(investor), depositAmount);
+        hevm.setWETHBalance(address(user), depositAmount);
 
         // Set the price oracle
         uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
         oracle.setPrice(collateralPrice);
 
         // Mint the token
-        // investor.mint(address(ethrise), depositAmount);
+        // user.mint(address(ethrise), depositAmount);
 
         // Check the collateral per RISE token and debt per RISE token
         assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
@@ -566,7 +598,7 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new swap contract, with artificial slippage 0.5%
         uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        Swap swap = new Swap(slippage);
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
 
         // Create new ETHRISE token
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
