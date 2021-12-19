@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
-// Risedle RISE Token Vault Contract
-// TOKENRISE is 2x leverage long token.
-//
 // Copyright (c) 2021 Bayu - All rights reserved
-// github: pyk
-// email: bayu@risedle.com
 pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
@@ -21,6 +15,9 @@ import { IRisedleSwap } from "./interfaces/IRisedleSwap.sol";
 import { IRisedleERC20 } from "./interfaces/IRisedleERC20.sol";
 import { IWETH9 } from "./interfaces/IWETH9.sol";
 
+/// @title Rise Token Vault
+/// @author bayu (github.com/pyk)
+/// @dev It implements leveraged tokens. User can mint leveraged tokens, redeem leveraged tokens and trigger the rebalance. Rebalance only get execute when the criteria is met.
 contract RiseTokenVault is RisedleVault {
     using SafeERC20 for IERC20;
 
@@ -237,34 +234,24 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
-     * @notice borrowAndSwap borrow supply asset from the vault and buy more collateral
-     * @return borrowAmount The amount of supply borrowed to 2x leverage the collateralAmount
+     * @notice swap swaps the inputToken to outputToken
+     * @return inputTokenSold The amount of input token sold to get the outputAmount
      */
-    function borrowAndSwap(
+    function swap(
         address swapContract, // The address of swap contract
-        address collateralToken, // The address of the collateral token
-        uint256 collateralAmount, // The collateral amount
-        uint256 collateralPrice, // The collateral price
-        uint8 collateralDecimals // The collateral decimals
-    ) internal returns (uint256 borrowAmount) {
-        // Maximum plus +1% from the oracle price
-        uint256 maximumCollateralPrice = collateralPrice + ((0.01 ether * collateralPrice) / 1 ether);
+        address inputToken, // The address of the token that we want to sell
+        address outputToken, // The address of the output token that we want to buy
+        uint256 maxInputAmount, // The maximum amount of input token that we want to sell
+        uint256 outputAmount // The amount of output token that we want to buy
+    ) internal returns (uint256 inputTokenSold) {
+        // Allow swap contract to spend the input token from the contract
+        IERC20(inputToken).safeApprove(swapContract, maxInputAmount);
 
-        // Get the collateral value
-        uint256 maxSupplyOut = (collateralAmount * maximumCollateralPrice) / (10**collateralDecimals);
-
-        // Make sure we do have enough vault's underlying available
-        require(getTotalAvailableCash() > maxSupplyOut, "!NES");
-
-        // Allow swap contract to spend the vault's underlying token
-        IERC20(underlyingToken).safeApprove(swapContract, maxSupplyOut);
-
-        // Buy more collateral using the Risedle Swap contract
-        // We want to get exact amount of collateral with minimal vault's underlying as possible
-        borrowAmount = IRisedleSwap(swapContract).swap(underlyingToken, collateralToken, maxSupplyOut, collateralAmount);
+        // Swap inputToken to outputToken
+        inputTokenSold = IRisedleSwap(swapContract).swap(inputToken, outputToken, maxInputAmount, outputAmount);
 
         // Reset the approval
-        IERC20(underlyingToken).safeApprove(swapContract, 0);
+        IERC20(inputToken).safeApprove(swapContract, 0);
     }
 
     /**
@@ -315,16 +302,20 @@ contract RiseTokenVault is RisedleVault {
 
         // Get the current price of collateral in term of vault underlying asset
         uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
-
-        // Get the borrow amount
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
-        uint256 borrowAmount = borrowAndSwap(riseTokenMetadata.swapContract, riseTokenMetadata.collateral, collateralAmount, collateralPrice, collateralDecimals);
+        // Maximum slippage from the oracle price; It can be +X% from the oracle price
+        uint256 maxCollateralPrice = collateralPrice + ((riseTokenMetadata.maxSwapSlippageInEther * collateralPrice) / 1 ether);
+        // Calculate the maximum borrow amount
+        uint256 maxBorrowAmount = (collateralAmount * maxCollateralPrice) / (10**collateralDecimals);
+        // Make sure we do have enough vault's underlying available
+        require(getTotalAvailableCash() > maxBorrowAmount, "!NES");
+        uint256 borrowedAmount = swap(riseTokenMetadata.swapContract, underlyingToken, riseTokenMetadata.collateral, maxBorrowAmount, collateralAmount);
 
         // Set TOKENRISE debt states
-        setBorrowStates(token, borrowAmount);
+        setBorrowStates(token, borrowedAmount);
 
         // Calculate minted amount
-        uint256 mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowAmount, collateralDecimals);
+        uint256 mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowedAmount, collateralDecimals);
 
         // Transfer TOKENRISE to the caller
         IRisedleERC20(token).mint(msg.sender, mintedAmount);
@@ -375,27 +366,6 @@ contract RiseTokenVault is RisedleVault {
 
         // Calculate the leverage ratio in ether units
         leverageRatioInEther = (collateralValuePerRiseToken * 1 ether) / nav;
-    }
-
-    /**
-     * @notice swap swaps the inputToken to outputToken
-     * @return inputTokenSold The amount of input token sold to get the outputAmount
-     */
-    function swap(
-        address swapContract, // The address of swap contract
-        address inputToken, // The address of the token that we want to sell
-        address outputToken, // The address of the output token that we want to buy
-        uint256 maxInputAmount, // The maximum amount of input token that we want to sell
-        uint256 outputAmount // The amount of output token that we want to buy
-    ) internal returns (uint256 inputTokenSold) {
-        // Allow swap contract to spend the input token from the contract
-        IERC20(inputToken).safeApprove(swapContract, maxInputAmount);
-
-        // Swap inputToken to outputToken
-        inputTokenSold = IRisedleSwap(swapContract).swap(inputToken, outputToken, maxInputAmount, outputAmount);
-
-        // Reset the approval
-        IERC20(inputToken).safeApprove(swapContract, 0);
     }
 
     /**
