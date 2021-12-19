@@ -48,10 +48,5 @@ contract USDCToTokenSwap is IRisedleSwap {
 
         // Transfer the specified amount of tokenOut to the caller
         IERC20(tokenOut).safeTransfer(msg.sender, amountOut);
-
-        // Transfer back the leftover
-        if (maxAmountIn > amountIn) {
-            IERC20(tokenIn).safeTransfer(msg.sender, maxAmountIn - amountIn);
-        }
     }
 }
