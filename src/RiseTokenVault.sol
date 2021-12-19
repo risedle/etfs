@@ -361,6 +361,15 @@ contract RiseTokenVault is RisedleVault {
         mintRiseToken(token, msg.sender, msg.sender, amount);
     }
 
+    // Custom recipient
+    function mint(
+        address token,
+        address recipient,
+        uint256 amount
+    ) external {
+        mintRiseToken(token, msg.sender, recipient, amount);
+    }
+
     /**
      * @notice calculateLeverageRatio calculates leverage ratio
      * @return leverageRatioInEther leverage ratio in ether units (e.g. 2 is 2*1e18)
