@@ -361,6 +361,60 @@ contract RiseTokenVaultExternalTest is DSTest {
         user.mintWithERC20(address(unirise), depositAmount);
     }
 
+    /// @notice Make sure it fails when the supply is very low
+    function testFail_UserCannotMintETHRISEWhenNotEnoughSupply() public {
+        // Update the contract balance to 100K USDC; We use this to supply the vault
+        uint256 vaultSupplyAmount = 100_000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new price oracle for the collateral
+        Oracle oracle = new Oracle();
+
+        // Create new swap contract, with artificial slippage 10%
+        uint256 slippage = 0.1 ether; // 10% slippage to buy more collateral
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
+
+        // Fund the swap contract with UNI
+        hevm.setWETHBalance(address(swap), 1_000_000 ether); // 1M WETH token
+
+        // Create new ETHRISE
+        uint256 initialPrice = 100 * 1e6; // 100 USDC
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
+        vault.create(
+            true,
+            address(ethrise),
+            WETH_ADDRESS,
+            address(oracle),
+            address(swap),
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            initialPrice, // Initial price
+            feeInEther, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Create new dummy user
+        uint256 depositAmount = 100 ether; // 100 ETH
+        DummyUser user = new DummyUser(vault);
+
+        // Set the price oracle
+        uint256 collateralPrice = 4_000 * 1e6; // 4K USDC
+        oracle.setPrice(collateralPrice);
+
+        // Mint the UNIRISE; due to high slippage it should be failed
+        user.mintWithETH{ value: depositAmount }(address(ethrise));
+    }
+
     /// @notice Make sure the ETHRISE minting process works correctly
     function test_MintETHRISE() public {
         // Update the contract balance to 100K USDC
