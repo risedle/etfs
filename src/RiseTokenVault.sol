@@ -200,8 +200,7 @@ contract RiseTokenVault is RisedleVault {
     /**
      * @notice Get the net-asset value of the TOKENRISE
      * @param token The address of TOKENRISE
-     * @return nav The NAV value of TOKENRISE in term of vault's underlying asset.
-     * For example ETHRISE in USDC vault would be 200 * 1e6
+     * @return nav The NAV value of TOKENRISE in term of vault's underlying asset. For example ETHRISE in USDC vault would be 200 * 1e6
      */
     function getNAV(address token) public view returns (uint256 nav) {
         // Make sure the TOKENRISE is exists
@@ -275,10 +274,13 @@ contract RiseTokenVault is RisedleVault {
 
     /**
      * @notice Mint new TOKENRISE
-     * @param token The address of TOKENRISE
-     * @param amount The collateral amount
      */
-    function mint(address token, uint256 amount) public nonReentrant {
+    function mintRiseToken(
+        address token, // The address of TOKENRISE
+        address minter, // The minter address
+        address recipient, // The TOKENRISE recipient
+        uint256 amount // The Amount
+    ) internal nonReentrant {
         // Accrue interest
         accrueInterest();
 
@@ -290,8 +292,11 @@ contract RiseTokenVault is RisedleVault {
         // For example, If ETHRISE nav is 200 USDC, it will returns 200 * 1e6
         uint256 nav = getNAV(token);
 
-        // Transfer ERC20 collateral to the contract
-        IERC20(riseTokenMetadata.collateral).safeTransferFrom(msg.sender, address(this), amount);
+        // Transfer ERC20 collateral to the contract if the minter is not the contract
+        // The minter is contract when the user send the ETH instead of ERC20 coz we wrap the eth automatically
+        if (minter != address(this)) {
+            IERC20(riseTokenMetadata.collateral).safeTransferFrom(minter, address(this), amount);
+        }
 
         // Get the collateral and fee amount
         (uint256 collateralAmount, uint256 feeAmount) = getCollateralAndFeeAmount(amount, riseTokenMetadata.feeInEther);
@@ -318,10 +323,10 @@ contract RiseTokenVault is RisedleVault {
         uint256 mintedAmount = getMintAmount(nav, collateralAmount, collateralPrice, borrowedAmount, collateralDecimals);
 
         // Transfer TOKENRISE to the caller
-        IRisedleERC20(token).mint(msg.sender, mintedAmount);
+        IRisedleERC20(token).mint(recipient, mintedAmount);
 
         // Emit the event
-        emit RiseTokenMinted(msg.sender, token, mintedAmount);
+        emit RiseTokenMinted(recipient, token, mintedAmount);
     }
 
     /**
@@ -329,7 +334,7 @@ contract RiseTokenVault is RisedleVault {
      * @dev The transaction will revert if the TOKENRISE is not ETH leveraged token
      * @param token The address of TOKENRISE
      */
-    function mint(address token) external payable nonReentrant {
+    function mint(address token) external payable {
         // Make sure the TOKENRISE is exists
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE");
@@ -343,8 +348,17 @@ contract RiseTokenVault is RisedleVault {
         // Wrap the ETH to WETH
         IWETH9(riseTokenMetadata.collateral).deposit{ value: msg.value }();
 
-        // Mint the ETHRISE token
-        mint(token, msg.value);
+        // Mint the ETHRISE token as the contract and send the ETHRISE to the user
+        mintRiseToken(token, address(this), msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Mint new ERC20RISE
+     * @param token The address of ERC20RISE
+     * @param amount The amount of ERC20
+     */
+    function mint(address token, uint256 amount) external {
+        mintRiseToken(token, msg.sender, msg.sender, amount);
     }
 
     /**
