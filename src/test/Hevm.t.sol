@@ -3,10 +3,10 @@ pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import "./Hevm.sol";
-import {USDC_ADDRESS, USDT_ADDRESS, WETH_ADDRESS} from "chain/Constants.sol";
+import { USDC_ADDRESS, USDT_ADDRESS, WETH_ADDRESS } from "chain/Constants.sol";
 
 contract HevmTest is DSTest {
     Hevm hevm;
@@ -52,6 +52,21 @@ contract HevmTest is DSTest {
 
         // Set the balance
         hevm.setWETHBalance(account, amount);
+
+        // Check the balance
+        uint256 balance = token.balanceOf(account);
+
+        // Make sure it's updated
+        assertEq(amount, balance);
+    }
+
+    function test_setUNIBalance() public {
+        IERC20 token = IERC20(UNI_ADDRESS);
+        address account = hevm.addr(1);
+        uint256 amount = 100 * 1e6; // 100 UNI
+
+        // Set the balance
+        hevm.setUNIBalance(account, amount);
 
         // Check the balance
         uint256 balance = token.balanceOf(account);
