@@ -392,6 +392,23 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
+     * @notice Get the leverage ratio
+     * @param token The TOKENRISE address
+     */
+    function getLeverageRatioInEther(address token) external returns (uint256 leverageRatioInEther) {
+        // Make sure the TOKENRISE is exists
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        if (riseTokenMetadata.feeInEther == 0) return 0;
+
+        uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
+        uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
+        uint256 collateralPerRiseToken = getCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+        uint256 debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
+        uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
+        leverageRatioInEther = calculateLeverageRatio(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
+    }
+
+    /**
      * @notice Run the rebalancing
      * @param token The TOKENRISE address
      */
