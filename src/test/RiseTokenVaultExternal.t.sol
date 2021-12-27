@@ -107,7 +107,7 @@ contract RiseTokenVaultExternalTest is DSTest {
             1.7 ether, // Min leverage ratio is 1.7x
             2.3 ether, // Max leverage ratio is 2.3x
             250000 * 1e6, // Max value of sell/buy is 250K USDC
-            0.2 ether // Rebalancing step is 0.2x
+            0.3 ether // Rebalancing step is 0.3x
         );
     }
 
@@ -428,7 +428,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getTotalAvailableCash(), (100_000 * 1e6) - (16666.317000 * 1e6), "Total available cash is invalid");
     }
 
-    /// @notice Scenario 1: User mint token below the NAV price
+    /// @notice User mint token below the NAV price
     function test_MintRISETokenBelowNAVPrice() public {
         // Create new price oracles for the collateral
         CustomizableOracle ethOracle = new CustomizableOracle();
@@ -463,7 +463,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(unirise.balanceOf(address(uniriseUser)), 0.7455038 ether);
     }
 
-    /// @notice Scenario 1: User mint token equal to the NAV price
+    /// @notice User mint token equal to the NAV price
     function test_MintRISETokenEqualNAVPrice() public {
         // Create new price oracles for the collateral
         CustomizableOracle ethOracle = new CustomizableOracle();
@@ -515,55 +515,51 @@ contract RiseTokenVaultExternalTest is DSTest {
     //        - totalDebt should be decreased
     //
     // Rebalancing rules:
-    // 1. When leverage ratio x < 2: leveraging up
-    // 2. When leverage ratio x > 3: leveraging down
-    // 3. When leverage ratio 2 < x < 3: revert, dont do anything
+    // 1. When leverage ratio x < 1.7: leveraging up
+    // 2. When leverage ratio x > 2.3: leveraging down
+    // 3. When leverage ratio 1.7 < x < 2.3: revert, dont do anything
 
-    function test_DailyRebalancingTimestampLessThan24HourAndPartialRebalancingIsFalse() public {
-        // Deploy the RISE token vault
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
-
-        // Supply USDC
-        uint256 vaultSupplyAmount = 400000 * 1e6; // 400K USDC
-        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
-        vault.addSupply(vaultSupplyAmount);
-
-        // Create new price oracle contract
+    function test_ETHRISELeverageUp() public {
+        // Create new price oracles for the collateral
         CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
-        // Set WETH price to 4000 USDC
-        oracle.setPrice(4000 * 1e6);
+        // Create new swap contracts, with artificial slippage 0.5%
+        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        hevm.setWETHBalance(address(swapUSDCToWETH), 1_000_000 ether); // 1_000_000 WETH token
 
-        // Create new swap contract, with artificial slippage 0.5%
-        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
+        // Create new vaults for ETHRISE
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapUSDCToWETH, true, WETH_ADDRESS, initialPrice);
 
-        // Create new ETHRISE token
-        RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        sendETH(payable(address(user)), 1 ether);
 
-        // Add ETHRISE token to the vault
-        vault.create(
-            true,
-            address(ethrise),
-            WETH_ADDRESS,
-            address(oracle),
-            address(swap),
-            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
-            100 * 1e6, // Initial price 100 USDC
-            0.001 ether, // creation and redemption fees is 0.1%
-            1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
-            250000 * 1e6, // Max value of sell/buy is 250K USDC
-            0.2 ether // Rebalancing step is 0.2x
-        );
+        // Mint ETHRISE
+        user.mintWithETH(address(ethrise), 1 ether);
 
-        // Mint some ETHRISE
-        uint256 mintAmount = 2 ether; // 2 WETH converted to ETHRISE
-        hevm.setWETHBalance(address(this), mintAmount);
-        vault.mint(address(ethrise), mintAmount);
+        // Initial leverage ratio is 2.010050251X
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 2010050250000000000);
 
-        // Execute the rebalance; should be failed coz the timestamp is not more than 24 hours and the partial rebalance is not set to true
+        // Set ETH price to go up, then leverage ratio will go down
+        oracle.setPrice(4_900 * 1e6);
+
+        // Validate NAV and leverage ratio
+        assertEq(vault.getNAV(address(ethrise)), 145226130);
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 1695501732367308830); // 1.69x
+
+        // Execute the rebalance
         vault.rebalance(address(ethrise));
+
+        // The nav should not change
+        assertEq(vault.getNAV(address(ethrise)), 145008291);
+
+        // The leverage ratio should change
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 1998499478902209805); // 1.99x
+
+        // The ETHRISE debt should be increased
+        assertEq(vault.getOutstandingDebt(address(ethrise)), 5756907321);
     }
 
     // Test Redeem
