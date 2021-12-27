@@ -562,6 +562,40 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getOutstandingDebt(address(ethrise)), 5756907321);
     }
 
+    function testFail_ETHRISELeverageUpFailedWhenHighSlippage() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
+
+        // Create new swap contracts, with artificial slippage 10%
+        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(oracle), 0.1 ether);
+        hevm.setWETHBalance(address(swapUSDCToWETH), 1_000_000 ether); // 1_000_000 WETH token
+
+        // Create new vaults for ETHRISE
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapUSDCToWETH, true, WETH_ADDRESS, initialPrice);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        sendETH(payable(address(user)), 1 ether);
+
+        // Mint ETHRISE
+        user.mintWithETH(address(ethrise), 1 ether);
+
+        // Initial leverage ratio is 2.010050251X
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 2010050250000000000);
+
+        // Set ETH price to go up, then leverage ratio will go down
+        oracle.setPrice(4_900 * 1e6);
+
+        // Validate NAV and leverage ratio
+        assertEq(vault.getNAV(address(ethrise)), 145226130);
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 1695501732367308830); // 1.69x
+
+        // Execute the rebalance; Should be failed with high slippage
+        vault.rebalance(address(ethrise));
+    }
+
     // Test Redeem
     // mint, no price change, then redeem, User should receive their collateral back minus 0.2% fee
     // mint, price go up, then redeem, User should receive their collateral back plus their profit
