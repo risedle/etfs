@@ -433,15 +433,15 @@ contract RiseTokenVault is RisedleVault {
         require(leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther || leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther, "!LRIR"); // Leverage ratio in range
 
         // Calculate the borrow or repay amount
-        uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * nav * totalSupply) / 1 ether;
+        uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * ((nav * totalSupply) / 10**collateralDecimals)) / 1 ether;
         uint256 collateralAmount = (borrowOrRepayAmount * (10**collateralDecimals)) / collateralPrice;
 
         // Leveraging up when: leverage ratio < min leverage ratio
         // 1. Borrow more USDC
         // 2. Swap USDC to collateral token
         if (leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther) {
-            uint256 maximumCollateralPrice = collateralPrice + ((0.01 ether * collateralPrice) / 1 ether);
-            // Maximum plus +1% from the oracle price
+            uint256 maximumCollateralPrice = collateralPrice + ((riseTokenMetadata.maxSwapSlippageInEther * collateralPrice) / 1 ether);
+            // Maximum plus max slippage from the oracle price
             uint256 maxBorrowAmount = (collateralAmount * maximumCollateralPrice) / (10**collateralDecimals);
             if (maxBorrowAmount > riseTokenMetadata.maxRebalancingValue) {
                 maxBorrowAmount = riseTokenMetadata.maxRebalancingValue;
@@ -461,7 +461,7 @@ contract RiseTokenVault is RisedleVault {
         // 1. Swap collateral to USDC
         // 2. Repay the debt
         if (leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther) {
-            uint256 minimumCollateralPrice = collateralPrice - ((0.01 ether * collateralPrice) / 1 ether);
+            uint256 minimumCollateralPrice = collateralPrice - ((riseTokenMetadata.maxSwapSlippageInEther * collateralPrice) / 1 ether);
             uint256 maxCollateralAmount = (collateralAmount * minimumCollateralPrice) / (10**collateralDecimals);
             if (borrowOrRepayAmount > riseTokenMetadata.maxRebalancingValue) {
                 borrowOrRepayAmount = riseTokenMetadata.maxRebalancingValue;
