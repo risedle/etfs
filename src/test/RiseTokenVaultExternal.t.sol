@@ -463,128 +463,39 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(unirise.balanceOf(address(uniriseUser)), 0.7455038 ether);
     }
 
-    /// @notice Scenario 2: User mint token equal to the NAV price
+    /// @notice Scenario 1: User mint token equal to the NAV price
     function test_MintRISETokenEqualNAVPrice() public {
-        // Update the contract balance to 100K USDC
-        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
-        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+        // Create new price oracles for the collateral
+        CustomizableOracle ethOracle = new CustomizableOracle();
+        ethOracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
+        CustomizableOracle uniOracle = new CustomizableOracle();
+        uniOracle.setPrice(10 * 1e6); // Set UNI price to 10 USDC
 
-        // Create new RISE token vault first; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        // Create new swap contracts, with artificial slippage 0.5%
+        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(ethOracle), 0.005 ether);
+        hevm.setWETHBalance(address(swapUSDCToWETH), 1_000 ether); // 1000 WETH token
+        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(uniOracle), 0.005 ether);
+        hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1M UNI token
 
-        // Add supply to the vault
-        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
-        vault.addSupply(vaultSupplyAmount);
+        // Create new vaults for ETHRISE & UNIRISE
+        uint256 ethriseInitialPrice = 100 * 1e6; // Initial price is 100 USDC
+        uint256 uniriseInitialPrice = 10 * 1e6; // Initial price is 10 USDC
+        (RiseTokenVault ethriseVault, RisedleERC20 ethrise) = createNewVault(ethOracle, swapUSDCToWETH, true, WETH_ADDRESS, ethriseInitialPrice);
+        (RiseTokenVault uniriseVault, RisedleERC20 unirise) = createNewVault(uniOracle, swapUSDCToUNI, false, UNI_ADDRESS, uniriseInitialPrice);
 
-        // Create new price oracle for the collateral
-        CustomizableOracle oracle = new CustomizableOracle();
+        // Create the dummy users
+        DummyUser ethriseUser = new DummyUser(ethriseVault);
+        sendETH(payable(address(ethriseUser)), 0.025 ether);
+        DummyUser uniriseUser = new DummyUser(uniriseVault);
+        hevm.setUNIBalance(address(uniriseUser), 1 ether);
 
-        // Create new swap contract, with artificial slippage 0.5%
-        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
+        // Mint RISE token with deposit below nav price
+        ethriseUser.mintWithETH(address(ethrise), 0.025 ether);
+        uniriseUser.mintWithERC20(address(unirise), 1 ether);
 
-        // Fund the swap contract
-        hevm.setWETHBalance(address(swap), 100 ether);
-
-        // Create new RISE token as owner
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
-        uint256 feeInEther = 0.001 ether; // 0.1%
-        // Create new ETHRISE token
-        RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
-        vault.create(
-            true,
-            address(ethrise),
-            WETH_ADDRESS,
-            address(oracle),
-            address(swap),
-            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
-            initialPrice, // Initial price 100 USDC
-            feeInEther, // creation and redemption fees is 0.1%
-            1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
-            250000 * 1e6, // Max value of sell/buy is 250K USDC
-            0.2 ether // Rebalancing step is 0.2x
-        );
-
-        // Create new dummy user
-        DummyUser user = new DummyUser(vault);
-
-        // Set the user WETH balance
-        uint256 depositAmount = 0.0250 ether;
-        hevm.setWETHBalance(address(user), depositAmount);
-
-        // Set the price oracle
-        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
-        oracle.setPrice(collateralPrice);
-
-        // Mint the token
-        // user.mint(address(ethrise), depositAmount);
-
-        // Check the collateral per RISE token and debt per RISE token
-        assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
-        assertEq(vault.getDebtPerRiseToken(address(ethrise)), 100984724);
-    }
-
-    /// @notice Scenario 3: User mint token above to the NAV price
-    function test_MintRISETokenAboveNAVPrice() public {
-        // Update the contract balance to 100K USDC
-        uint256 vaultSupplyAmount = 100000 * 1e6; // 100K USDC
-        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
-
-        // Create new RISE token vault first; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
-
-        // Add supply to the vault
-        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
-        vault.addSupply(vaultSupplyAmount);
-
-        // Create new price oracle for the collateral
-        CustomizableOracle oracle = new CustomizableOracle();
-
-        // Create new swap contract, with artificial slippage 0.5%
-        uint256 slippage = 0.005 ether; // 0.5% slippage to buy more collateral
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), slippage);
-
-        // Fund the swap contract
-        hevm.setWETHBalance(address(swap), 100 ether);
-
-        // Create new RISE token as owner
-        uint256 initialPrice = 100 * 1e6; // 100 USDC
-        uint256 feeInEther = 0.001 ether; // 0.1%
-        // Create new ETHRISE token
-        RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
-        vault.create(
-            true,
-            address(ethrise),
-            WETH_ADDRESS,
-            address(oracle),
-            address(swap),
-            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
-            initialPrice, // Initial price 100 USDC
-            feeInEther, // creation and redemption fees is 0.1%
-            1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
-            250000 * 1e6, // Max value of sell/buy is 250K USDC
-            0.2 ether // Rebalancing step is 0.2x
-        );
-
-        // Create new dummy user
-        DummyUser user = new DummyUser(vault);
-
-        // Set the user WETH balance
-        uint256 depositAmount = 0.0375 ether;
-        hevm.setWETHBalance(address(user), depositAmount);
-
-        // Set the price oracle
-        uint256 collateralPrice = 4000 * 1e6; // 4000 USDC
-        oracle.setPrice(collateralPrice);
-
-        // Mint the token
-        // user.mint(address(ethrise), depositAmount);
-
-        // Check the collateral per RISE token and debt per RISE token
-        assertEq(vault.getCollateralPerRiseToken(address(ethrise)), 50246181139343977);
-        assertEq(vault.getDebtPerRiseToken(address(ethrise)), 100984724);
+        // Validate
+        assertEq(ethrise.balanceOf(address(ethriseUser)), 0.9940050 ether);
+        assertEq(unirise.balanceOf(address(uniriseUser)), 0.9940050 ether);
     }
 
     // Leverage ratio behaviours
