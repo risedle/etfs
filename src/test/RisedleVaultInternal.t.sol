@@ -3,7 +3,7 @@
 // Risedle's Vault Internal Test
 // Test & validate all Risedle Vault internal functionalities
 
-pragma solidity 0.8.9;
+pragma solidity >=0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";

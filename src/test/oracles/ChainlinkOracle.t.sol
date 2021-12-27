@@ -3,7 +3,7 @@
 // Risedle Chainlink Oracle test
 // Make sure the price oracle is working as expected
 
-pragma solidity 0.8.9;
+pragma solidity >=0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
