@@ -35,9 +35,9 @@ contract DummyUser {
     }
 
     /// @notice Mint TOKENRISE using ETH
-    function mintWithETH(address token) public payable {
+    function mintWithETH(address token, uint256 amount) public payable {
         // Mint TOKENRISE using ETH
-        _vault.mint{ value: msg.value }(token);
+        _vault.mint{ value: amount }(token);
     }
 
     function mintWithERC20(address token, uint256 collateralAmount) public {
@@ -51,6 +51,8 @@ contract DummyUser {
         // Reset the approval
         IERC20(collateralToken).safeApprove(address(_vault), 0);
     }
+
+    receive() external payable {}
 }
 
 /// @title RiseTokenVault External test
@@ -62,6 +64,13 @@ contract RiseTokenVaultExternalTest is DSTest {
     /// @notice Run the test setup
     function setUp() public {
         hevm = new Hevm();
+    }
+
+    /// @notice Send ETH
+    function sendETH(address payable recipient, uint256 amount) public {
+        // Transfer ETH to the user
+        (bool success, ) = recipient.call{ value: amount }("");
+        require(success, "!FTSE"); // Failed to send ETH
     }
 
     // Utility function to create new ERC20RISE vault and token
@@ -118,10 +127,11 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new dummy user
         DummyUser user = new DummyUser(vault);
+        sendETH(payable(address(user)), 1 ether);
 
         // Mint the UNIRISE token with ETH, it should be failed
         uint256 depositAmount = 1 ether;
-        user.mintWithETH{ value: depositAmount }(address(unirise));
+        user.mintWithETH(address(unirise), depositAmount);
     }
 
     /// @notice Make sure it fails when user trying to mint ETHRISE with zero ETH
@@ -140,10 +150,12 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Create new dummy user
         DummyUser user = new DummyUser(vault);
+        // Transfer ETH to the user
+        sendETH(payable(address(user)), 1 ether);
 
         // Mint the ETHRISE token with zero ETH, it should be failed
         uint256 depositAmount = 0 ether;
-        user.mintWithETH{ value: depositAmount }(address(ethrise));
+        user.mintWithETH(address(ethrise), depositAmount);
     }
 
     /// @notice Make sure it fails when user trying to mint and high slippage happen
@@ -189,8 +201,11 @@ contract RiseTokenVaultExternalTest is DSTest {
         uint256 depositAmount = 1 ether; // 1 ETH
         DummyUser user = new DummyUser(vault);
 
-        // Mint the UNIRISE; due to high slippage it should be failed
-        user.mintWithETH{ value: depositAmount }(address(ethrise));
+        // Transfer ETH to the user
+        sendETH(payable(address(user)), depositAmount);
+
+        // Mint the ETHRISE; due to high slippage it should be failed
+        user.mintWithETH(address(ethrise), depositAmount);
     }
 
     /// @notice Make sure it fails when the supply is very low
@@ -235,13 +250,15 @@ contract RiseTokenVaultExternalTest is DSTest {
         // Create new dummy user
         uint256 depositAmount = 100 ether; // 100 ETH
         DummyUser user = new DummyUser(vault);
+        // Transfer ETH to the user
+        sendETH(payable(address(user)), depositAmount);
 
         // Set the price oracle
         uint256 collateralPrice = 4_000 * 1e6; // 4K USDC
         oracle.setPrice(collateralPrice);
 
         // Mint the UNIRISE; due to high slippage it should be failed
-        user.mintWithETH{ value: depositAmount }(address(ethrise));
+        user.mintWithETH(address(ethrise), depositAmount);
     }
 
     // Subsquent minting:
@@ -327,6 +344,88 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(riseTokenMetadata.totalPendingFees, 0.04 ether, "UNIRISE totalPendingFees is invalid");
         assertEq(vault.getOutstandingDebt(address(unirise)), 672.676650 * 1e6, "UNIRISE outstandingDebt is invalid");
         assertEq(vault.getTotalAvailableCash(), (100_000 * 1e6) - (672.676650 * 1e6), "Total available cash is invalid");
+    }
+
+    /// @notice Make sure the user get the same amount of ETHRISE
+    function test_SubsequentMintETHRISE() public {
+        // Create new price oracle for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4000 USDC
+
+        // Create new swap contract, with artificial slippage 0.5%
+        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        // Fund the swap contract with WETH
+        hevm.setWETHBalance(address(swap), 1_000 ether); // 1000 WETH token
+
+        // Create new vault
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swap, true, WETH_ADDRESS, initialPrice);
+
+        // Create the first dummy user
+        uint256 depositAmount = 1 ether; // 1 ETH
+        uint256 userBalance = 2 ether; // 2 ETH
+        DummyUser firstUser = new DummyUser(vault);
+        // Transfer ETH to the firstUser
+        sendETH(payable(address(firstUser)), userBalance);
+
+        // First user mint the ETHRISE
+        firstUser.mintWithETH(address(ethrise), depositAmount);
+
+        // Validate the expected values
+        // ETHRISE token should be transfered to the firstUser
+        assertEq(IERC20(address(ethrise)).balanceOf(address(firstUser)), 39.7602000 ether, "firstUser: Wrong ETHRISE balance");
+
+        // The ETH should be transfered from the user to the contract
+        assertEq(address(firstUser).balance, userBalance - depositAmount, "firstUser: ETH is not transfered");
+        assertEq(IERC20(WETH_ADDRESS).balanceOf(address(vault)), 1.999 ether, "firstUser: WETH token is not transfered to the contract"); // Deposit from user + swapped amount
+
+        // Make sure the ETHRISE token vault states is correct
+        RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(address(ethrise));
+
+        // Make sure the totalCollateral and totalPendingFees is correct
+        assertEq(riseTokenMetadata.totalCollateral, 1.999 ether, "firstUser: ETHRISE total collateral is incorrect"); // 2x collateralAmount + fees
+        assertEq(riseTokenMetadata.totalPendingFees, 0.001 ether, "firstUser: ETHRISE total pending fees is incorrect"); // 0.1% from deposit amount
+
+        // Make sure the totalDebt of the ETHRISE token is correct
+        assertEq(vault.getOutstandingDebt(address(ethrise)), 4015.98 * 1e6, "firstUser: ETHRISE borrow amount is incorrect"); // Bought 4000 USDC with ~0.5% slippage
+
+        // Make sure the total available cash is correct
+        assertEq(vault.getTotalAvailableCash(), (100_000 * 1e6) - (4015.98 * 1e6), "firstUser: Total available cash is invalid");
+
+        // Make sure the NAV doesn't change
+        assertEq(vault.getNAV(address(ethrise)), initialPrice);
+
+        // ! NEXT MINTING
+        // Second user with same deposit amount should have the same amount of minted token
+        DummyUser secondUser = new DummyUser(vault);
+        sendETH(payable(address(secondUser)), userBalance);
+        secondUser.mintWithETH(address(ethrise), depositAmount);
+        assertEq(IERC20(address(ethrise)).balanceOf(address(secondUser)), 39.7602000 ether, "secondUser: Wrong ETHRISE balance");
+
+        // ! NEXT MINTING
+        // Third user, collateral price go up, nav go up, should receive less amount of UNIRISE token
+        oracle.setPrice(4_400 * 1e6);
+        assertEq(vault.getNAV(address(ethrise)), 120100502, "thirdUser: NAV invalid"); // ~120 USDC
+        DummyUser thirdUser = new DummyUser(vault);
+        sendETH(payable(address(thirdUser)), userBalance);
+        thirdUser.mintWithETH(address(ethrise), depositAmount);
+        assertEq(IERC20(address(ethrise)).balanceOf(address(thirdUser)), 36416350699350115955, "thirdUser: Wrong ETHRISE balance");
+
+        // ! NEXT Minting
+        // Fourth user, collateral price go down, nav go down, should receive more amount of ETHRISE token
+        oracle.setPrice(4_200 * 1e6);
+        assertEq(vault.getNAV(address(ethrise)), 109760382, "fourthUser: NAV invalid"); // ~109 USDC
+        DummyUser fourthUser = new DummyUser(vault);
+        sendETH(payable(address(fourthUser)), userBalance);
+        fourthUser.mintWithETH(address(ethrise), depositAmount);
+        assertEq(IERC20(address(ethrise)).balanceOf(address(fourthUser)), 38035773235555976836, "fourthUser: Wrong ETHRISE balance");
+
+        // Validate the ETHRISE token states
+        riseTokenMetadata = vault.getMetadata(address(ethrise));
+        assertEq(riseTokenMetadata.totalCollateral, 7.99600 ether, "ETHRISE totalCollateral is invalid");
+        assertEq(riseTokenMetadata.totalPendingFees, 0.004 ether, "ETHRISE totalPendingFees is invalid");
+        assertEq(vault.getOutstandingDebt(address(ethrise)), 16666.317000 * 1e6, "ETHRISE outstandingDebt is invalid");
+        assertEq(vault.getTotalAvailableCash(), (100_000 * 1e6) - (16666.317000 * 1e6), "Total available cash is invalid");
     }
 
     /// @notice Scenario 1: User mint token below the NAV price
