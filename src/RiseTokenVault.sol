@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2021 Bayu - All rights reserved
-pragma solidity 0.8.9;
+pragma solidity >=0.8.9;
 pragma experimental ABIEncoderV2;
 
 import { IERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";

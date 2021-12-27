@@ -10,7 +10,7 @@
 // github: pyk
 // email: bayu@risedle.com
 
-pragma solidity 0.8.9;
+pragma solidity >=0.8.9;
 pragma experimental ABIEncoderV2;
 
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";

@@ -2,7 +2,7 @@
 
 // Rise Token Vault Access control test
 // Make sure the ownership is working as expected
-pragma solidity 0.8.9;
+pragma solidity >=0.8.9;
 pragma experimental ABIEncoderV2;
 
 import "lib/ds-test/src/test.sol";
