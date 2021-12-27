@@ -596,6 +596,49 @@ contract RiseTokenVaultExternalTest is DSTest {
         vault.rebalance(address(ethrise));
     }
 
+    function test_ERC20RISELeverageUp() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
+
+        // Create new swap contracts, with artificial slippage 0.5%
+        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1_000_000 UNI token
+
+        // Create new vaults for UNIRISE
+        uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
+        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapUSDCToUNI, false, UNI_ADDRESS, initialPrice);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        hevm.setUNIBalance(address(user), 10 ether); //
+
+        // Mint UNIRISE
+        user.mintWithERC20(address(unirise), 10 ether); // Mint UNIRISE with 10 UNI
+
+        // Initial leverage ratio is 2.010050251X
+        assertEq(vault.getLeverageRatioInEther(address(unirise)), 2010050200000000000);
+
+        // Set UNI price to go up, then leverage ratio will go down
+        oracle.setPrice(18.4 * 1e6);
+
+        // Validate NAV and leverage ratio
+        assertEq(vault.getNAV(address(unirise)), 14556114);
+        assertEq(vault.getLeverageRatioInEther(address(unirise)), 1693900995828969187); // 1.69x
+
+        // Execute the rebalance
+        vault.rebalance(address(unirise));
+
+        // The nav should not change
+        assertEq(vault.getNAV(address(unirise)), 14534280);
+
+        // The leverage ratio should change
+        assertEq(vault.getLeverageRatioInEther(address(unirise)), 1996896303084844932); // 1.99x
+
+        // The UNIRISE debt should be increased
+        assertEq(vault.getOutstandingDebt(address(unirise)), 216034624);
+    }
+
     // Test Redeem
     // mint, no price change, then redeem, User should receive their collateral back minus 0.2% fee
     // mint, price go up, then redeem, User should receive their collateral back plus their profit
