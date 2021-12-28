@@ -287,4 +287,41 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
             debtProportion[token] -= repayProportion;
         }
     }
+
+    /// @notice setVaultParameters updates the vault parameters.
+    function setVaultParameters(
+        uint256 u,
+        uint256 s1,
+        uint256 s2,
+        uint256 mr,
+        uint256 fee
+    ) external onlyOwner {
+        // Update vault parameters
+        optimalUtilizationRateInEther = u;
+        interestSlope1InEther = s1;
+        interestSlope2InEther = s2;
+        maxBorrowRatePerSecondInEther = mr;
+        performanceFeeInEther = fee;
+
+        emit ParametersUpdated(msg.sender, u, s1, s2, mr, fee);
+    }
+
+    /// @notice getVaultParameters returns the current vault parameters.
+    function getVaultParameters()
+        external
+        view
+        returns (
+            uint256 _optimalUtilizationRateInEther,
+            uint256 _interestSlope1InEther,
+            uint256 _interestSlope2InEther,
+            uint256 _maxBorrowRatePerSecondInEther,
+            uint256 _performanceFeeInEther
+        )
+    {
+        _optimalUtilizationRateInEther = optimalUtilizationRateInEther;
+        _interestSlope1InEther = interestSlope1InEther;
+        _interestSlope2InEther = interestSlope2InEther;
+        _maxBorrowRatePerSecondInEther = maxBorrowRatePerSecondInEther;
+        _performanceFeeInEther = performanceFeeInEther;
+    }
 }
