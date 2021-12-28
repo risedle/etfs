@@ -113,10 +113,10 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /**
-     * @notice getCollateralPerRiseToken returns the collateral shares per TOKENRISE
+     * @notice calculateCollateralPerRiseToken returns the collateral shares per TOKENRISE
      * @return collateralPerRiseToken The amount of collateral per TOKENRISE (e.g. 0.5 ETH is 0.5*1e18)
      */
-    function getCollateralPerRiseToken(
+    function calculateCollateralPerRiseToken(
         uint256 riseTokenSupply, // The total supply of the TOKENRISE
         uint256 totalCollateral, // The total collateral managed by the TOKENRISE
         uint256 totalPendingFees, // The total pending fees in the TOKENRISE
@@ -141,14 +141,14 @@ contract RiseTokenVault is RisedleVault {
         uint256 riseTokenSupply = IERC20(riseTokenMetadata.token).totalSupply();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.token).decimals();
 
-        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+        collateralPerRiseToken = calculateCollateralPerRiseToken(riseTokenSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
     }
 
     /**
-     * @notice getDebtPerRiseToken returns the debt shares per TOKENRISE
+     * @notice calculateDebtPerRiseToken returns the debt shares per TOKENRISE
      * @return debtPerRiseToken The amount of debt per TOKENRISE (e.g. 80 USDC is 80*1e6)
      */
-    function getDebtPerRiseToken(
+    function calculateDebtPerRiseToken(
         address token, // The address of TOKENRISE (ERC20)
         uint256 totalSupply, // The current total supply of the TOKENRISE
         uint8 collateralDecimals // The decimals of the collateral token (e.g. ETH have 18 decimals)
@@ -174,7 +174,7 @@ contract RiseTokenVault is RisedleVault {
 
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.token).decimals();
-        debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
+        debtPerRiseToken = calculateDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
     }
 
     /**
@@ -214,8 +214,8 @@ contract RiseTokenVault is RisedleVault {
         // Get collateral per TOKENRISE and debt per TOKENRISE
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.token).decimals();
-        uint256 collateralPerRiseToken = getCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
-        uint256 debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
+        uint256 collateralPerRiseToken = calculateCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+        uint256 debtPerRiseToken = calculateDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
 
         nav = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
     }
@@ -402,8 +402,8 @@ contract RiseTokenVault is RisedleVault {
 
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
-        uint256 collateralPerRiseToken = getCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
-        uint256 debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
+        uint256 collateralPerRiseToken = calculateCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+        uint256 debtPerRiseToken = calculateDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
         uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
         leverageRatioInEther = calculateLeverageRatio(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
     }
@@ -424,8 +424,8 @@ contract RiseTokenVault is RisedleVault {
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
         uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice();
         uint8 collateralDecimals = IERC20Metadata(riseTokenMetadata.collateral).decimals();
-        uint256 collateralPerRiseToken = getCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
-        uint256 debtPerRiseToken = getDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
+        uint256 collateralPerRiseToken = calculateCollateralPerRiseToken(totalSupply, riseTokenMetadata.totalCollateral, riseTokenMetadata.totalPendingFees, collateralDecimals);
+        uint256 debtPerRiseToken = calculateDebtPerRiseToken(riseTokenMetadata.token, totalSupply, collateralDecimals);
         uint256 leverageRatioInEther = calculateLeverageRatio(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
         uint256 nav = calculateNAV(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
 
@@ -433,7 +433,7 @@ contract RiseTokenVault is RisedleVault {
         require(leverageRatioInEther < riseTokenMetadata.minLeverageRatioInEther || leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther, "!LRIR"); // Leverage ratio in range
 
         // Calculate the borrow or repay amount
-        uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * ((nav * totalSupply) / 10**collateralDecimals)) / 1 ether;
+        uint256 borrowOrRepayAmount = (riseTokenMetadata.rebalancingStepInEther * ((nav * totalSupply) / (10**collateralDecimals))) / 1 ether;
         uint256 collateralAmount = (borrowOrRepayAmount * (10**collateralDecimals)) / collateralPrice;
 
         // Leveraging up when: leverage ratio < min leverage ratio
@@ -462,12 +462,12 @@ contract RiseTokenVault is RisedleVault {
         // 2. Repay the debt
         if (leverageRatioInEther > riseTokenMetadata.maxLeverageRatioInEther) {
             uint256 minimumCollateralPrice = collateralPrice - ((riseTokenMetadata.maxSwapSlippageInEther * collateralPrice) / 1 ether);
-            uint256 maxCollateralAmount = (collateralAmount * minimumCollateralPrice) / (10**collateralDecimals);
+            uint256 maxCollateralAmount = (borrowOrRepayAmount * (10**collateralDecimals)) / minimumCollateralPrice;
             if (borrowOrRepayAmount > riseTokenMetadata.maxRebalancingValue) {
-                borrowOrRepayAmount = riseTokenMetadata.maxRebalancingValue;
+                maxCollateralAmount = (riseTokenMetadata.maxRebalancingValue * (10**collateralDecimals)) / minimumCollateralPrice;
             }
 
-            // Collateral to USDC
+            // Swap Collateral to USDC
             uint256 collateralSoldAmount = swap(riseTokenMetadata.swapContract, riseTokenMetadata.collateral, underlyingToken, maxCollateralAmount, borrowOrRepayAmount);
 
             // Repay the debts
