@@ -129,7 +129,7 @@ contract RiseTokenVault is RisedleVault {
         address token, // The address of TOKENRISE (ERC20)
         uint256 totalSupply, // The current total supply of the TOKENRISE
         uint8 collateralDecimals // The decimals of the collateral token (e.g. ETH have 18 decimals)
-    ) internal returns (uint256 debtPerRiseToken) {
+    ) internal view returns (uint256 debtPerRiseToken) {
         if (totalSupply == 0) return 0;
         uint256 totalDebt = getOutstandingDebt(token); // Get total TOKENRISE debt
         if (totalDebt == 0) return 0;
