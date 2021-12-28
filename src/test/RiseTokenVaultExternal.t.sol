@@ -14,8 +14,8 @@ import { SafeERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/util
 import { Hevm } from "./Hevm.sol";
 import { RiseTokenVault } from "../RiseTokenVault.sol";
 import { RisedleERC20 } from "../tokens/RisedleERC20.sol";
-import { USDCToTokenSwap } from "../swaps/USDCToTokenSwap.sol";
 import { CustomizableOracle } from "../oracles/CustomizableOracle.sol";
+import { CustomizableSwap } from "../swaps/CustomizableSwap.sol";
 
 import { IRisedleOracle } from "../interfaces/IRisedleOracle.sol";
 import { IRisedleSwap } from "../interfaces/IRisedleSwap.sol";
@@ -105,7 +105,7 @@ contract RiseTokenVaultExternalTest is DSTest {
             initialPrice, // Initial price
             feeInEther, // creation and redemption fees is 0.1%
             1.7 ether, // Min leverage ratio is 1.7x
-            2.3 ether, // Max leverage ratio is 2.3x
+            3 ether, // Max leverage ratio is 3x
             250000 * 1e6, // Max value of sell/buy is 250K USDC
             0.3 ether // Rebalancing step is 0.3x
         );
@@ -118,7 +118,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contract, with artificial slippage 0.5%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.005 ether);
         // Fund the swap contract with ERC20
         hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
 
@@ -141,7 +141,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contract, with artificial slippage 0.5%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.005 ether);
         // Fund the swap contract with WETH
         hevm.setWETHBalance(address(swap), 1_000 ether); // 1K WETH token
 
@@ -165,7 +165,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contract, with artificial slippage 10%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.1 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.1 ether);
         // Fund the swap contract with ERC20
         hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
 
@@ -190,7 +190,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contract, with artificial slippage 10%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.1 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.1 ether);
         // Fund the swap contract with WETH
         hevm.setWETHBalance(address(swap), 1_000 ether); // 1K WETH token
 
@@ -215,7 +215,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contract, with artificial slippage 1%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.01 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.01 ether);
         // Fund the swap contract with ERC20
         hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
 
@@ -240,7 +240,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contract, with artificial slippage 1%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.01 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.01 ether);
         // Fund the swap contract with WETH
         hevm.setWETHBalance(address(swap), 1_000 ether); // 1K WETH token
 
@@ -273,7 +273,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contract, with artificial slippage 0.5%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.005 ether);
         // Fund the swap contract with ERC20
         hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
 
@@ -353,7 +353,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4000 USDC
 
         // Create new swap contract, with artificial slippage 0.5%
-        USDCToTokenSwap swap = new USDCToTokenSwap(address(oracle), 0.005 ether);
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.005 ether);
         // Fund the swap contract with WETH
         hevm.setWETHBalance(address(swap), 1_000 ether); // 1000 WETH token
 
@@ -437,9 +437,9 @@ contract RiseTokenVaultExternalTest is DSTest {
         uniOracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contracts, with artificial slippage 0.5%
-        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(ethOracle), 0.005 ether);
+        CustomizableSwap swapUSDCToWETH = new CustomizableSwap(address(ethOracle), 0.005 ether);
         hevm.setWETHBalance(address(swapUSDCToWETH), 1_000 ether); // 1000 WETH token
-        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(uniOracle), 0.005 ether);
+        CustomizableSwap swapUSDCToUNI = new CustomizableSwap(address(uniOracle), 0.005 ether);
         hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1M UNI token
 
         // Create new vaults for ETHRISE & UNIRISE
@@ -472,9 +472,9 @@ contract RiseTokenVaultExternalTest is DSTest {
         uniOracle.setPrice(10 * 1e6); // Set UNI price to 10 USDC
 
         // Create new swap contracts, with artificial slippage 0.5%
-        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(ethOracle), 0.005 ether);
+        CustomizableSwap swapUSDCToWETH = new CustomizableSwap(address(ethOracle), 0.005 ether);
         hevm.setWETHBalance(address(swapUSDCToWETH), 1_000 ether); // 1000 WETH token
-        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(uniOracle), 0.005 ether);
+        CustomizableSwap swapUSDCToUNI = new CustomizableSwap(address(uniOracle), 0.005 ether);
         hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1M UNI token
 
         // Create new vaults for ETHRISE & UNIRISE
@@ -516,8 +516,8 @@ contract RiseTokenVaultExternalTest is DSTest {
     //
     // Rebalancing rules:
     // 1. When leverage ratio x < 1.7: leveraging up
-    // 2. When leverage ratio x > 2.3: leveraging down
-    // 3. When leverage ratio 1.7 < x < 2.3: revert, dont do anything
+    // 2. When leverage ratio x > 3: leveraging down
+    // 3. When leverage ratio 1.7 < x < 3: revert, dont do anything
 
     function test_ETHRISELeverageUp() public {
         // Create new price oracles for the collateral
@@ -525,12 +525,12 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contracts, with artificial slippage 0.5%
-        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(oracle), 0.005 ether);
-        hevm.setWETHBalance(address(swapUSDCToWETH), 1_000_000 ether); // 1_000_000 WETH token
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
+        hevm.setWETHBalance(address(swapContract), 1_000_000 ether); // 1_000_000 WETH token
 
         // Create new vaults for ETHRISE
         uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
-        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapUSDCToWETH, true, WETH_ADDRESS, initialPrice);
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapContract, true, WETH_ADDRESS, initialPrice);
 
         // Create the dummy users
         DummyUser user = new DummyUser(vault);
@@ -568,7 +568,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contracts, with artificial slippage 10%
-        USDCToTokenSwap swapUSDCToWETH = new USDCToTokenSwap(address(oracle), 0.1 ether);
+        CustomizableSwap swapUSDCToWETH = new CustomizableSwap(address(oracle), 0.1 ether);
         hevm.setWETHBalance(address(swapUSDCToWETH), 1_000_000 ether); // 1_000_000 WETH token
 
         // Create new vaults for ETHRISE
@@ -602,12 +602,12 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contracts, with artificial slippage 0.5%
-        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(oracle), 0.005 ether);
-        hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1_000_000 UNI token
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
+        hevm.setUNIBalance(address(swapContract), 1_000_000 ether); // 1_000_000 UNI token
 
         // Create new vaults for UNIRISE
         uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
-        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapUSDCToUNI, false, UNI_ADDRESS, initialPrice);
+        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapContract, false, UNI_ADDRESS, initialPrice);
 
         // Create the dummy users
         DummyUser user = new DummyUser(vault);
@@ -645,12 +645,12 @@ contract RiseTokenVaultExternalTest is DSTest {
         oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
 
         // Create new swap contracts, with artificial slippage 10%
-        USDCToTokenSwap swapUSDCToUNI = new USDCToTokenSwap(address(oracle), 0.1 ether);
-        hevm.setUNIBalance(address(swapUSDCToUNI), 1_000_000 ether); // 1_000_000 UNI token
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.1 ether);
+        hevm.setUNIBalance(address(swapContract), 1_000_000 ether); // 1_000_000 UNI token
 
         // Create new vaults for UNIRISE
         uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
-        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapUSDCToUNI, false, UNI_ADDRESS, initialPrice);
+        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapContract, false, UNI_ADDRESS, initialPrice);
 
         // Create the dummy users
         DummyUser user = new DummyUser(vault);
@@ -671,6 +671,50 @@ contract RiseTokenVaultExternalTest is DSTest {
 
         // Execute the rebalance; This should be failed
         vault.rebalance(address(unirise));
+    }
+
+    function test_ETHRISELeverageDown() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
+
+        // Create new swap contracts, with artificial slippage 0.5%
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
+        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC
+        hevm.setWETHBalance(address(swapContract), 1_000_000 ether); // 1_000_000 WETH
+
+        // Create new vaults for ETHRISE
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapContract, true, WETH_ADDRESS, initialPrice);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        sendETH(payable(address(user)), 1 ether);
+
+        // Mint ETHRISE
+        user.mintWithETH(address(ethrise), 1 ether);
+
+        // Initial leverage ratio is ~2X
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 2010050250000000000);
+
+        // Set ETH price to go down, then leverage ratio will go up
+        oracle.setPrice(3_000 * 1e6);
+
+        // Validate NAV and leverage ratio
+        assertEq(vault.getNAV(address(ethrise)), 49748743);
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 3030303057104377491); // 3x
+
+        // Execute the rebalance
+        vault.rebalance(address(ethrise));
+
+        // The nav should not change
+        assertEq(vault.getNAV(address(ethrise)), 49822995);
+
+        // The leverage ratio should change
+        assertEq(vault.getLeverageRatioInEther(address(ethrise)), 2727724356996202255); // 2.7x
+
+        // The ETHRISE debt should be decreased
+        assertEq(vault.getOutstandingDebt(address(ethrise)), 3422574009);
     }
 
     // Test Redeem
