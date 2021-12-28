@@ -35,8 +35,8 @@ contract ChainlinkOracleTest is DSTest {
         // Get price
         uint256 price = IRisedleOracle(address(oracle)).getPrice();
 
-        // The price should > 50000 USDC (50000 * 1e6)
-        assertGt(price, 50000 * 1e6);
+        // The price should > 4000 USDC (4000 * 1e6)
+        assertGt(price, 40000 * 1e6);
 
         // The price should < 80000 USDC (80000 * 1e6)
         assertLt(price, 80000 * 1e6);
