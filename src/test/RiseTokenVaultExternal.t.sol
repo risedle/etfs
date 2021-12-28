@@ -1053,4 +1053,33 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.totalOutstandingDebt(), totalOutstandingDebt); // Debt should not change
         assertEq(vault.totalPendingFees(), 0); // Total pending fee should be reset
     }
+
+    function testFail_MaxTotalCollateralCap() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
+
+        // Create new swap contracts, with artificial slippage 0.5%
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
+        hevm.setUNIBalance(address(swapContract), 1_000_000 ether); // 1_000_000 UNI token
+        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC token
+
+        // Create new vaults for UNIRISE
+        uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
+        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapContract, false, UNI_ADDRESS, initialPrice);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        hevm.setUNIBalance(address(user), 1_000_000 ether);
+
+        // Set max total collateral cap
+        vault.setMaxTotalCollateral(address(unirise), 1_000 ether);
+
+        // Mint UNIRISE
+        user.mintWithERC20(address(unirise), 200 ether);
+        user.mintWithERC20(address(unirise), 200 ether);
+        user.mintWithERC20(address(unirise), 200 ether);
+        user.mintWithERC20(address(unirise), 200 ether);
+        user.mintWithERC20(address(unirise), 400 ether); // This should be failed
+    }
 }
