@@ -68,4 +68,23 @@ contract RisedleVaultAccessControlTest is DSTest {
 
         assertEq(vault.FEE_RECIPIENT(), feeRecipient);
     }
+
+    /// @notice Make sure non-owner cannot set max vault's total deposit
+    function testFail_NonOwnerCannotSetMaxTotalDeposit() public {
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        // Transfer ownership
+        address newOwner = hevm.addr(1);
+        vault.transferOwnership(newOwner);
+
+        // Try set max total deposit; should be failed
+        vault.setVaultMaxTotalDeposit(1_000_000 * 1e6);
+    }
+
+    /// @notice Make sure owner can set max total deposit
+    function test_OwnerCanSetMaxTotalDeposit() public {
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
+        vault.setVaultMaxTotalDeposit(1_000_000 * 1e6);
+        assertEq(vault.maxTotalDeposit(), 1_000_000 * 1e6);
+    }
 }
