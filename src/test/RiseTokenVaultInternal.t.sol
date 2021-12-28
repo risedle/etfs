@@ -35,7 +35,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
     }
 
     /// @notice Make sure the collateral per RISE token is working as expected
-    function test_GetCollateralPerRiseToken() public {
+    function test_CalculateCollateralPerRiseToken() public {
         uint256 collateralPerRiseToken;
         uint256 riseTokenTotalSupply;
         uint256 riseTokenTotalCollateral;
@@ -47,7 +47,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         riseTokenTotalCollateral = 0;
         riseTokenTotalPendingFees = 0;
         riseTokenCollateralDecimals = 18;
-        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        collateralPerRiseToken = calculateCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
         assertEq(collateralPerRiseToken, 0);
 
         // Set RiseToken states
@@ -55,7 +55,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         riseTokenTotalCollateral = 9 ether;
         riseTokenTotalPendingFees = 1 ether;
         riseTokenCollateralDecimals = 18;
-        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        collateralPerRiseToken = calculateCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
         assertEq(collateralPerRiseToken, 0.8 ether);
 
         // User very large number
@@ -63,19 +63,19 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         riseTokenTotalCollateral = (9 * 1e12) * 1 ether;
         riseTokenTotalPendingFees = (1 * 1e12) * 1 ether;
         riseTokenCollateralDecimals = 18;
-        collateralPerRiseToken = getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        collateralPerRiseToken = calculateCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
         assertEq(collateralPerRiseToken, 0.8 ether);
     }
 
     /// @notice Make sure it fails when totalPendingFees > totalCollateral
-    function testFail_GetCollateralPerRiseTokenFeeTooLarge() public pure {
+    function testFail_CalculateCollateralPerRiseTokenFeeTooLarge() public pure {
         // Test too large fees
         uint256 riseTokenTotalSupply = 10 ether;
         uint256 riseTokenTotalCollateral = 12 ether;
         uint256 riseTokenTotalPendingFees = 15 ether;
         uint8 riseTokenCollateralDecimals = 18;
         // This should be failed
-        getCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
+        calculateCollateralPerRiseToken(riseTokenTotalSupply, riseTokenTotalCollateral, riseTokenTotalPendingFees, riseTokenCollateralDecimals);
     }
 
     // Utils to set the total debt of given RiseToken
@@ -88,7 +88,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
     }
 
     /// @notice Make sure getDebtPerRiseToken is correct
-    function test_GetDebtPerRiseToken() public {
+    function test_CalculateDebtPerRiseToken() public {
         address riseToken;
         uint256 borrowAmount;
         uint256 riseTokenTotalSupply;
@@ -100,7 +100,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         borrowAmount = 0;
         setRiseTokenDebt(riseToken, borrowAmount);
         riseTokenTotalSupply = 0;
-        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        debtPerRiseToken = calculateDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
         assertEq(debtPerRiseToken, 0);
 
         // Create new Risedle RiseToken token
@@ -108,7 +108,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         borrowAmount = 1000 * 1e6; // 1K USDC
         setRiseTokenDebt(riseToken, borrowAmount);
         riseTokenTotalSupply = 10 ether;
-        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        debtPerRiseToken = calculateDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
         assertEq(debtPerRiseToken, 100 * 1e6); // 100 USDC per RiseToken
 
         // Let's simulate other RiseToken borrow once again
@@ -116,7 +116,7 @@ contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSy
         borrowAmount = 2000 * 1e6; // 2K USDC
         setRiseTokenDebt(riseToken, borrowAmount);
         riseTokenTotalSupply = 10 ether;
-        debtPerRiseToken = getDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
+        debtPerRiseToken = calculateDebtPerRiseToken(riseToken, riseTokenTotalSupply, riseTokenCollateralDecimals);
         assertEq(debtPerRiseToken, 200 * 1e6); // 200 USDC per RiseToken
     }
 
