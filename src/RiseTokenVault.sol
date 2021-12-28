@@ -35,6 +35,7 @@ contract RiseTokenVault is RisedleVault {
         uint256 maxLeverageRatioInEther; // Maximum leverage ratio  in ether units (e.g. 3x is 3 ether = 3*1e18)
         uint256 maxRebalancingValue; // The maximum value of buy/sell when rebalancing (e.g. 500K USDC is 500000 * 1e6)
         uint256 rebalancingStepInEther; // The rebalancing step in ether units (e.g. 0.2 is 0.2 ether or 0.2 * 1e18)
+        uint256 maxTotalCollateral; // Limit the mint amount
     }
 
     /// @notice Mapping TOKENRISE to their metadata
@@ -87,7 +88,8 @@ contract RiseTokenVault is RisedleVault {
             maxRebalancingValue: maxRebalancingValue,
             rebalancingStepInEther: rebalancingStepInEther,
             totalCollateralPlusFee: 0,
-            totalPendingFees: 0
+            totalPendingFees: 0,
+            maxTotalCollateral: 0
         });
 
         // Map new info to their token
@@ -212,6 +214,7 @@ contract RiseTokenVault is RisedleVault {
     ) internal nonReentrant {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
+        if (riseTokenMetadata.maxTotalCollateral > 0) require(riseTokenMetadata.totalCollateralPlusFee + (2 * amount) < riseTokenMetadata.maxTotalCollateral, "!CIR"); // Cap is reached
         accrueInterest(); // Accrue interest
         uint256 nav = getNAV(token); // For example, If ETHRISE nav is 200 USDC, it will returns 200 * 1e6
         if (minter != address(this)) IERC20(riseTokenMetadata.collateral).safeTransferFrom(minter, address(this), amount); // Don't get WETH from the user
@@ -277,10 +280,7 @@ contract RiseTokenVault is RisedleVault {
         leverageRatioInEther = (collateralValuePerRiseToken * 1 ether) / nav;
     }
 
-    /**
-     * @notice Get the leverage ratio
-     * @param token The TOKENRISE address
-     */
+    /// @notice Get the leverage ratio
     function getLeverageRatioInEther(address token) external view returns (uint256 leverageRatioInEther) {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         if (riseTokenMetadata.feeInEther == 0) return 0; // Make sure the TOKENRISE is exists
@@ -292,10 +292,7 @@ contract RiseTokenVault is RisedleVault {
         leverageRatioInEther = calculateLeverageRatio(collateralPerRiseToken, debtPerRiseToken, collateralPrice, riseTokenMetadata.initialPrice, collateralDecimals);
     }
 
-    /**
-     * @notice Run the rebalancing
-     * @param token The TOKENRISE address
-     */
+    /// @notice Run the rebalancing
     function rebalance(address token) external nonReentrant {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
@@ -395,6 +392,13 @@ contract RiseTokenVault is RisedleVault {
         riseTokens[token].totalPendingFees = 0;
 
         emit FeeCollected(msg.sender, riseTokenMetadata.totalPendingFees, FEE_RECIPIENT);
+    }
+
+    /// @notice Set the cap
+    function setMaxTotalCollateral(address token, uint256 maxTotalCollateral) external onlyOwner {
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
+        riseTokens[token].maxTotalCollateral = maxTotalCollateral;
     }
 
     /// @notice Receive ETH
