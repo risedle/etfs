@@ -41,6 +41,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     uint256 public totalPendingFees;
     /// @notice The total debt proportion issued by the vault, the usage is similar to the vault token supply. In order to track the outstanding debt of the RISE/DROP token
     uint256 internal totalDebtProportion;
+    /// @notice Max vault's total deposit
+    uint256 public maxTotalDeposit;
     /// @notice Fee recipient
     address public FEE_RECIPIENT;
 
@@ -73,6 +75,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         totalOutstandingDebt = 0; // Set the initial state
         totalPendingFees = 0;
         FEE_RECIPIENT = feeRecipient;
+        maxTotalDeposit = 0;
     }
 
     /// @notice Vault's token use the same decimals as the underlying
@@ -205,6 +208,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice Lender supplies underlying token into the vault and receives vault tokens in exchange
     function addSupply(uint256 amount) external nonReentrant {
         accrueInterest(); // Accrue interest
+        if (maxTotalDeposit != 0) require(IERC20(underlyingToken).balanceOf(address(this)) + amount < maxTotalDeposit, "!MCR"); // Max cap reached
         IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), amount); // Transfer asset from lender to the vault
         uint256 exchangeRateInEther = getExchangeRateInEther(); // Get the exchange rate
         uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther; // Calculate how much vault token we need to send to the lender
@@ -327,5 +331,10 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         totalPendingFees = 0;
 
         emit FeeCollected(msg.sender, collectedFees, FEE_RECIPIENT);
+    }
+
+    /// @notice setVaultMaxTotalDeposit sets the max total deposit of the vault
+    function setVaultMaxTotalDeposit(uint256 amount) external onlyOwner {
+        maxTotalDeposit = amount;
     }
 }
