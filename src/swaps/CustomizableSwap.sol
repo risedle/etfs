@@ -9,10 +9,12 @@ import { IERC20Metadata } from "lib/openzeppelin-contracts/contracts/token/ERC20
 import { IRisedleSwap } from "../interfaces/IRisedleSwap.sol";
 import { IRisedleOracle } from "../interfaces/IRisedleOracle.sol";
 
-/// @title USDCToTokenSwapper contract implements IRisesdleSwap
+import { USDC_ADDRESS } from "chain/Constants.sol";
+
+/// @title Contract implements IRisesdleSwap
 /// @author bayu (github.com/pyk)
 /// @dev This contract is used for testing only
-contract USDCToTokenSwap is IRisedleSwap {
+contract CustomizableSwap is IRisedleSwap {
     using SafeERC20 for IERC20;
 
     /// Storages
@@ -39,7 +41,12 @@ contract USDCToTokenSwap is IRisedleSwap {
 
         // Calculate amountIn
         uint8 tokenOutDecimals = IERC20Metadata(tokenOut).decimals();
-        amountIn = (amountOut * finalPrice) / (10**tokenOutDecimals);
+        uint8 tokenInDecimals = IERC20Metadata(tokenIn).decimals();
+        if (tokenIn == USDC_ADDRESS) {
+            amountIn = (amountOut * finalPrice) / (10**tokenOutDecimals);
+        } else {
+            amountIn = (amountOut * (10**tokenInDecimals)) / finalPrice;
+        }
 
         // Transfer the specified amount of tokenIn to this contract.
         // Should be failed when amountIn > maxAmountIn coz the caller only approve
