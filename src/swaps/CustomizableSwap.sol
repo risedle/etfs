@@ -37,14 +37,16 @@ contract CustomizableSwap is IRisedleSwap {
 
         // Add artificial slippage
         uint256 slippage = (slippageInEther * currentPrice) / 1 ether;
-        uint256 finalPrice = currentPrice + slippage;
+        uint256 finalPrice;
 
         // Calculate amountIn
         uint8 tokenOutDecimals = IERC20Metadata(tokenOut).decimals();
         uint8 tokenInDecimals = IERC20Metadata(tokenIn).decimals();
         if (tokenIn == USDC_ADDRESS) {
+            finalPrice = currentPrice + slippage; // Buy positive slippage
             amountIn = (amountOut * finalPrice) / (10**tokenOutDecimals);
         } else {
+            finalPrice = currentPrice - slippage; // Sell negative slippgage
             amountIn = (amountOut * (10**tokenInDecimals)) / finalPrice;
         }
 
