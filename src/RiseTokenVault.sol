@@ -42,13 +42,10 @@ contract RiseTokenVault is RisedleVault {
 
     /// @notice Event emitted when new TOKENRISE is created
     event RiseTokenCreated(address indexed creator, address token);
-
     /// @notice Event emitted when TOKENRISE is minted
     event RiseTokenMinted(address indexed user, address indexed riseToken, uint256 mintedAmount);
-
     /// @notice Event emitted when TOKENRISE is successfully rebalanced
     event RiseTokenRebalanced(address indexed executor, uint256 previousLeverageRatioInEther);
-
     /// @notice Event emitted when TOKENRISE is burned
     event RiseTokenBurned(address indexed user, address indexed riseToken, uint256 redeemedAmount);
 
@@ -397,7 +394,7 @@ contract RiseTokenVault is RisedleVault {
         riseTokens[token].totalCollateralPlusFee -= riseTokenMetadata.totalPendingFees;
         riseTokens[token].totalPendingFees = 0;
 
-        emit FeeCollected(msg.sender, collectedFees, FEE_RECIPIENT);
+        emit FeeCollected(msg.sender, riseTokenMetadata.totalPendingFees, FEE_RECIPIENT);
     }
 
     /// @notice Receive ETH

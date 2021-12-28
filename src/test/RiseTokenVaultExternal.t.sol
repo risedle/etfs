@@ -1001,4 +1001,56 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(ethrise.balanceOf(address(user)), 0);
         assertEq(address(user).balance, 843966377899210332); // 1 ETH plus profit minus 0.2% fee, swap slippage and swap fee
     }
+
+    function test_FeeCollections() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
+
+        // Create new swap contracts, with artificial slippage 0.5%
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
+        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC
+        hevm.setWETHBalance(address(swapContract), 1_000_000 ether); // 1_000_000 WETH
+
+        // Create new vaults for ETHRISE
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapContract, true, WETH_ADDRESS, initialPrice);
+        RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(address(ethrise));
+        assertEq(riseTokenMetadata.totalCollateralPlusFee, 0);
+        assertEq(riseTokenMetadata.totalPendingFees, 0);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        sendETH(payable(address(user)), 1 ether);
+        assertEq(address(user).balance, 1 ether);
+
+        // Mint ETHRISE
+        user.mintWithETH(address(ethrise), 1 ether);
+        riseTokenMetadata = vault.getMetadata(address(ethrise));
+        assertEq(riseTokenMetadata.totalCollateralPlusFee, 1.999 ether);
+        assertEq(riseTokenMetadata.totalPendingFees, 0.001 ether);
+
+        // Go to 30 days from now
+        hevm.warp(block.timestamp + 30 days);
+
+        // Collect pending fee from the ETHRISE, there will be 0.001 WETH
+        vault.collectPendingFees(address(ethrise));
+
+        // WETH transfered to the fee recipient
+        address feeRecipient = vault.FEE_RECIPIENT();
+        assertEq(IERC20(WETH_ADDRESS).balanceOf(feeRecipient), 0.001 ether);
+
+        // Rise token metadata should be updated
+        riseTokenMetadata = vault.getMetadata(address(ethrise));
+        assertEq(riseTokenMetadata.totalCollateralPlusFee, 1.998 ether);
+        assertEq(riseTokenMetadata.totalPendingFees, 0);
+
+        // Collect pending fees from the vault
+        uint256 totalOutstandingDebt = vault.totalOutstandingDebt();
+        uint256 totalPendingFees = vault.totalPendingFees();
+        vault.collectVaultPendingFees();
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(feeRecipient), totalPendingFees);
+        assertEq(vault.totalOutstandingDebt(), totalOutstandingDebt); // Debt should not change
+        assertEq(vault.totalPendingFees(), 0); // Total pending fee should be reset
+    }
 }
