@@ -130,7 +130,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         assertEq(riseTokenMetadata.maxLeverageRatioInEther, 2.3 ether);
         assertEq(riseTokenMetadata.maxRebalancingValue, 500000 * 1e6); // 500K USDC
         assertEq(riseTokenMetadata.rebalancingStepInEther, 0.2 ether); // Rebalancing step
-        assertEq(riseTokenMetadata.totalCollateral, 0);
+        assertEq(riseTokenMetadata.totalCollateralPlusFee, 0);
         assertEq(riseTokenMetadata.totalPendingFees, 0);
     }
 
@@ -179,7 +179,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         assertEq(riseTokenMetadata.maxLeverageRatioInEther, 2.3 ether);
         assertEq(riseTokenMetadata.maxRebalancingValue, 500000 * 1e6); // 500K USDC
         assertEq(riseTokenMetadata.rebalancingStepInEther, 0.2 ether); // Rebalancing step
-        assertEq(riseTokenMetadata.totalCollateral, 0);
+        assertEq(riseTokenMetadata.totalCollateralPlusFee, 0);
         assertEq(riseTokenMetadata.totalPendingFees, 0);
     }
 
