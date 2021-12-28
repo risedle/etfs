@@ -208,4 +208,70 @@ contract RiseTokenVaultAccessControlTest is DSTest {
         address burnFrom = hevm.addr(2);
         IRisedleERC20(address(ethrise)).burn(burnFrom, 1 ether); // Should be failed
     }
+
+    /// @notice Make sure non-owner cannot set max total collateral
+    function testFail_NonOwnerCannotSetMaxTotalCollateral() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        // Create dummy contract
+        address dummyOracleContract = hevm.addr(2);
+        address dummySwapContract = hevm.addr(3);
+
+        // Create new RISE token as owner
+        RisedleERC20 unirise = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            dummyOracleContract,
+            dummySwapContract,
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
+            0.001 ether, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Transfer ownership
+        address newOwner = hevm.addr(4);
+        vault.transferOwnership(newOwner);
+
+        // Try to set max collateral; this should be failed
+        vault.setMaxTotalCollateral(address(unirise), 1_000_000 ether);
+    }
+
+    /// @notice Make sure owner can set max total Collateral
+    function test_OwnerCanSetMaxTotalCollateral() public {
+        // Create new vault; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        // Create dummy contract
+        address dummyOracleContract = hevm.addr(2);
+        address dummySwapContract = hevm.addr(3);
+
+        // Create new RISE token as owner
+        RisedleERC20 unirise = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(unirise),
+            UNI_ADDRESS,
+            dummyOracleContract,
+            dummySwapContract,
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            100 * 1e6, // Initial price 100 USDC
+            0.001 ether, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            2.3 ether, // Max leverage ratio is 2.3x
+            500000 * 1e6, // Max value of sell/buy is 500K USDC
+            0.2 ether // Rebalancing step is 0.2x
+        );
+
+        // Set max collateral as owner
+        vault.setMaxTotalCollateral(address(unirise), 1_000_000 ether);
+        RiseTokenVault.RiseTokenMetadata memory riseTokenMetadata = vault.getMetadata(address(unirise));
+        assertEq(riseTokenMetadata.maxTotalCollateral, 1_000_000 ether);
+    }
 }
