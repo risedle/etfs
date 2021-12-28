@@ -159,4 +159,26 @@ contract RisedleVaultExternalTest is DSTest {
         // The exchange rate should be 1:1
         assertEq(vault.getExchangeRateInEther(), 1 ether);
     }
+
+    /// @notice Make sure the max cap is working
+    function testFail_CannotAddSupplyWhenCapIsReached() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Set max cap to 20_000 USDC
+        vault.setVaultMaxTotalDeposit(20_000 * 1e6);
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDC balance
+        uint256 amount = 19_000 * 1e6; // 19_000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
+
+        // Lender add supply to the vault
+        lender.lend(amount);
+
+        // Supply again this should be failed
+        lender.lend(amount);
+    }
 }
