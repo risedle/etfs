@@ -26,7 +26,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure non-owner cannot create new ETHRISE token
     function testFail_NonOwnerCannotCreateNewETHRISEToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Transfer the ownership
         address newOwner = hevm.addr(1);
@@ -57,7 +57,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure non-owner cannot create new ERC20RISE token
     function testFail_NonOwnerCannotCreateNewERC20RISEToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Transfer the ownership
         address newOwner = hevm.addr(1);
@@ -87,7 +87,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure owner can create new ETHRISE token
     function test_OwnerCanCreateNewETHRISEToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Create dummy contract
         address dummyOracleContract = hevm.addr(2);
@@ -137,7 +137,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure owner can create new ETHRISE token
     function test_OwnerCanCreateNewERC20RISEToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Create dummy contract
         address dummyOracleContract = hevm.addr(2);
@@ -186,7 +186,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure only vault can mint the ETHRISE token
     function testFail_NonRiseTokenVaultCannotMintRISEToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Create new RISE token as owner
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());
@@ -199,7 +199,7 @@ contract RiseTokenVaultAccessControlTest is DSTest {
     /// @notice Make sure only vault can burn the RISE token
     function testFail_NonRiseTokenVaultCannotBurnRiseToken() public {
         // Create new vault; by default the deployer is the owner
-        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Create new ETHRISE token
         RisedleERC20 ethrise = new RisedleERC20("ETH 2x Long Risedle", "ETHRISE", address(vault), IERC20Metadata(WETH_ADDRESS).decimals());

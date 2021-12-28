@@ -65,7 +65,7 @@ contract RisedleVaultExternalTest is DSTest {
 
     /// @notice utility to create new vault
     function createNewVault() internal returns (RisedleVault) {
-        return new RisedleVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        return new RisedleVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
     }
 
     /// @notice Make sure the rvToken public properties is correct

@@ -19,39 +19,30 @@ import { ReentrancyGuard } from "lib/openzeppelin-contracts/contracts/security/R
 /// @title Risedle Vault
 contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
     /// @notice Vault's underlying token address
     address internal underlyingToken;
-
     /// @notice Optimal utilization rate in ether units
     uint256 internal optimalUtilizationRateInEther = 0.9 ether; // 90% utilization
-
     /// @notice Interest slope 1 in ether units
     uint256 internal interestSlope1InEther = 0.2 ether; // 20% slope 1
-
     /// @notice Interest slop 2 in ether units
     uint256 internal interestSlope2InEther = 0.6 ether; // 60% slope 2
-
     /// @notice Number of seconds in a year (approximation)
     uint256 internal immutable totalSecondsInAYear = 31536000;
-
     /// @notice Maximum borrow rate per second in ether units
     uint256 internal maxBorrowRatePerSecondInEther = 50735667174; // 0.000000050735667174% Approx 393% APY
-
     /// @notice Performance fee for the lender
     uint256 internal performanceFeeInEther = 0.1 ether; // 10% performance fee
-
     /// @notice Timestamp that interest was last accrued at
     uint256 internal lastTimestampInterestAccrued;
-
     /// @notice The total amount of principal borrowed plus interest accrued
     uint256 public totalOutstandingDebt;
-
     /// @notice The total amount of pending fees to be collected in the vault
     uint256 public totalPendingFees;
-
     /// @notice The total debt proportion issued by the vault, the usage is similar to the vault token supply. In order to track the outstanding debt of the RISE/DROP token
     uint256 internal totalDebtProportion;
+    /// @notice Fee recipient
+    address public FEE_RECIPIENT;
 
     /// @notice Mapping RISE/DROP token to their debt proportion of totalOutstandingDebt
     /// @dev debt = debtProportion[token] * debtProportionRate
@@ -59,19 +50,14 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice Event emitted when the interest succesfully accrued
     event InterestAccrued(uint256 previousTimestamp, uint256 currentTimestamp, uint256 previousVaultTotalOutstandingDebt, uint256 previousVaultTotalPendingFees, uint256 borrowRatePerSecondInEther, uint256 elapsedSeconds, uint256 interestAmount, uint256 totalOutstandingDebt, uint256 totalPendingFees);
-
     /// @notice Event emitted when lender add supply to the vault
     event SupplyAdded(address indexed account, uint256 amount, uint256 ExchangeRateInEther, uint256 mintedAmount);
-
     /// @notice Event emitted when lender remove supply from the vault
     event SupplyRemoved(address indexed account, uint256 amount, uint256 ExchangeRateInEther, uint256 redeemedAmount);
-
     /// @notice Event emitted when vault parameters are updated
     event ParametersUpdated(address indexed updater, uint256 u, uint256 s1, uint256 s2, uint256 mr, uint256 fee);
-
     /// @notice Event emitted when the collected fees are withdrawn
     event FeeCollected(address collector, uint256 total, address feeRecipient);
-
     /// @notice Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newFeeRecipient);
 
@@ -79,12 +65,14 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     constructor(
         string memory name, // The name of the vault's token (e.g. Risedle USDC Vault)
         string memory symbol, // The symbol of the vault's token (e.g rvUSDC)
-        address underlying // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
+        address underlying, // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
+        address feeRecipient // Fee recipient
     ) ERC20(name, symbol) {
         underlyingToken = underlying; // Set the vault underlying token
         lastTimestampInterestAccrued = block.timestamp; // Set the last timestamp accrued
         totalOutstandingDebt = 0; // Set the initial state
         totalPendingFees = 0;
+        FEE_RECIPIENT = feeRecipient;
     }
 
     /// @notice Vault's token use the same decimals as the underlying
@@ -179,8 +167,8 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice setVaultStates update the totalOutstandingDebt and totalPendingFees
     function setVaultStates(uint256 interestAmount, uint256 currentTimestamp) internal {
         uint256 feeAmount = (performanceFeeInEther * interestAmount) / 1 ether; // Get the fee
-        totalOutstandingDebt = totalOutstandingDebt + interestAmount; // Update the states
-        totalPendingFees = totalPendingFees + feeAmount;
+        totalOutstandingDebt += interestAmount; // Update the states
+        totalPendingFees += feeAmount;
         lastTimestampInterestAccrued = currentTimestamp;
     }
 
@@ -323,5 +311,21 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         _interestSlope2InEther = interestSlope2InEther;
         _maxBorrowRatePerSecondInEther = maxBorrowRatePerSecondInEther;
         _performanceFeeInEther = performanceFeeInEther;
+    }
+
+    /// @notice setFeeRecipient sets the fee recipient address.
+    function setFeeRecipient(address account) external onlyOwner {
+        FEE_RECIPIENT = account;
+        emit FeeRecipientUpdated(msg.sender, account);
+    }
+
+    /// @notice collectPendingFees withdraws collected fees to the FEE_RECIPIENT address
+    function collectVaultPendingFees() external {
+        accrueInterest(); // Accrue interest
+        uint256 collectedFees = totalPendingFees;
+        IERC20(underlyingToken).safeTransfer(FEE_RECIPIENT, collectedFees);
+        totalPendingFees = 0;
+
+        emit FeeCollected(msg.sender, collectedFees, FEE_RECIPIENT);
     }
 }

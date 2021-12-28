@@ -90,7 +90,7 @@ contract RiseTokenVaultExternalTest is DSTest {
         hevm.setUSDCBalance(address(this), vaultSupplyAmount);
 
         // Create new vault first; by default the deployer is the owner
-        vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS);
+        vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Add supply to the vault
         IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);

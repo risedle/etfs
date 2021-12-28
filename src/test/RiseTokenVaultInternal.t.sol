@@ -25,8 +25,9 @@ import { USDC_ADDRESS, WETH_ADDRESS, UNISWAPV3_SWAP_ROUTER, CHAINLINK_USDC_USD, 
 string constant tokenName = "Risedle USDC Vault";
 string constant tokenSymbol = "rvUSDC";
 address constant underlying = USDC_ADDRESS;
+address constant feeRecipient = USDC_ADDRESS; // random address
 
-contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSymbol, underlying) {
+contract RiseTokenVaultInternalTest is DSTest, RiseTokenVault(tokenName, tokenSymbol, underlying, feeRecipient) {
     /// @notice hevm utils to alter mainnet state
     Hevm hevm;
 

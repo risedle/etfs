@@ -20,7 +20,7 @@ contract RisedleVaultAccessControlTest is DSTest {
 
     /// @notice Make sure non-owner cannot set vault parameters
     function testFail_NonOwnerCannotSetVaultParameters() public {
-        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS);
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Transfer ownership
         address newOwner = hevm.addr(1);
@@ -32,7 +32,7 @@ contract RisedleVaultAccessControlTest is DSTest {
 
     /// @notice Make sure owner can set vault parameters
     function test_OwnerCanSetVaultParameters() public {
-        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS);
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
 
         // Set vault
         vault.setVaultParameters(0, 0, 0, 0, 0);
@@ -44,5 +44,28 @@ contract RisedleVaultAccessControlTest is DSTest {
         assertEq(i2, 0);
         assertEq(br, 0);
         assertEq(pr, 0);
+    }
+
+    /// @notice Make sure non-owner cannot set fee recipient
+    function testFail_NonOwnerCannotSetFeeRecipient() public {
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        // Transfer ownership
+        address newOwner = hevm.addr(1);
+        vault.transferOwnership(newOwner);
+
+        // Try set fee recipient; should be failed
+        address feeRecipient = hevm.addr(2);
+        vault.setFeeRecipient(feeRecipient);
+    }
+
+    /// @notice Make sure owner can set vault parameters
+    function test_OwnerCanSetFeeRecipient() public {
+        RisedleVault vault = new RisedleVault("Risedle Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        address feeRecipient = hevm.addr(1);
+        vault.setFeeRecipient(feeRecipient);
+
+        assertEq(vault.FEE_RECIPIENT(), feeRecipient);
     }
 }

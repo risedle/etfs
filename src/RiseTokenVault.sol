@@ -56,8 +56,9 @@ contract RiseTokenVault is RisedleVault {
     constructor(
         string memory name, // The name of the vault's token (e.g. Risedle USDC Vault)
         string memory symbol, // The symbol of the vault's token (e.g rvUSDC)
-        address underlying // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
-    ) RisedleVault(name, symbol, underlying) {}
+        address underlying, // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
+        address feeRecipient // Vault's fee recipient
+    ) RisedleVault(name, symbol, underlying, feeRecipient) {}
 
     /// @notice create creates new TOKENRISE
     function create(
@@ -139,7 +140,7 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /// @notice getDebtPerRiseToken returns the debt shares per TOKENRISE
-    function getDebtPerRiseToken(address token) external returns (uint256 debtPerRiseToken) {
+    function getDebtPerRiseToken(address token) external view returns (uint256 debtPerRiseToken) {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         if (riseTokenMetadata.feeInEther == 0) return 0; // Make sure the TOKENRISE is exists
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();
@@ -161,7 +162,7 @@ contract RiseTokenVault is RisedleVault {
     }
 
     /// @notice Get the net-asset value of the TOKENRISE
-    function getNAV(address token) public returns (uint256 nav) {
+    function getNAV(address token) public view returns (uint256 nav) {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         if (riseTokenMetadata.feeInEther == 0) return 0; // Make sure the TOKENRISE is exists
         uint256 collateralPrice = IRisedleOracle(riseTokenMetadata.oracleContract).getPrice(); // For example WETH/USDC would trading around 4000 USDC (4000 * 1e6)
@@ -283,7 +284,7 @@ contract RiseTokenVault is RisedleVault {
      * @notice Get the leverage ratio
      * @param token The TOKENRISE address
      */
-    function getLeverageRatioInEther(address token) external returns (uint256 leverageRatioInEther) {
+    function getLeverageRatioInEther(address token) external view returns (uint256 leverageRatioInEther) {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         if (riseTokenMetadata.feeInEther == 0) return 0; // Make sure the TOKENRISE is exists
         uint256 totalSupply = IERC20(riseTokenMetadata.token).totalSupply();

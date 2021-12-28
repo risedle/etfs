@@ -21,8 +21,9 @@ import { USDC_ADDRESS } from "chain/Constants.sol";
 string constant tokenName = "Risedle USDC Vault";
 string constant tokenSymbol = "rvUSDC";
 address constant underlying = USDC_ADDRESS;
+address constant feeRecipient = USDC_ADDRESS; // random address
 
-contract RisedleVaultInternalTest is DSTest, RisedleVault(tokenName, tokenSymbol, underlying) {
+contract RisedleVaultInternalTest is DSTest, RisedleVault(tokenName, tokenSymbol, underlying, feeRecipient) {
     /// @notice hevm utils to alter mainnet state
     Hevm hevm;
 
