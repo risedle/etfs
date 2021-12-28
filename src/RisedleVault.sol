@@ -75,87 +75,53 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice Event emitted when the fee recipient is updated
     event FeeRecipientUpdated(address updater, address newFeeRecipient);
 
-    /**
-     * @notice Construct new RisedleVault
-     */
+    /// @notice Construct new RisedleVault
     constructor(
         string memory name, // The name of the vault's token (e.g. Risedle USDC Vault)
         string memory symbol, // The symbol of the vault's token (e.g rvUSDC)
         address underlying // The ERC20 address of the vault's underlying token (e.g. address of USDC token)
     ) ERC20(name, symbol) {
-        // Set the vault underlying token
-        underlyingToken = underlying;
-
-        // Set the last timestamp accrued
-        lastTimestampInterestAccrued = block.timestamp;
-
-        // Set the initial state
-        totalOutstandingDebt = 0;
+        underlyingToken = underlying; // Set the vault underlying token
+        lastTimestampInterestAccrued = block.timestamp; // Set the last timestamp accrued
+        totalOutstandingDebt = 0; // Set the initial state
         totalPendingFees = 0;
     }
 
-    /**
-     * @notice Vault's token use the same decimals as the underlying
-     */
+    /// @notice Vault's token use the same decimals as the underlying
     function decimals() public view virtual override returns (uint8) {
         return IERC20Metadata(underlyingToken).decimals();
     }
 
-    /**
-     * @notice getUnderlying returns the underlying token of the vault
-     */
+    /// @notice getUnderlying returns the underlying token of the vault
     function getUnderlying() external view returns (address underlying) {
         underlying = underlyingToken;
     }
 
-    /**
-     * @notice getTotalAvailableCash returns the total amount of vault's underlying token that available to borrow
-     * @return The amount of vault's underlying token available to borrow
-     */
+    /// @notice getTotalAvailableCash returns the total amount of vault's underlying token that available to borrow
     function getTotalAvailableCash() public view returns (uint256) {
         uint256 vaultBalance = IERC20(underlyingToken).balanceOf(address(this));
         if (totalPendingFees >= vaultBalance) return 0;
         return vaultBalance - totalPendingFees;
     }
 
-    /**
-     * @notice calculateUtilizationRateInEther calculates the utilization rate of the vault.
-     * @param available The amount of cash available to borrow in the vault
-     * @param outstandingDebt The amount of outstanding debt in the vault
-     * @return The utilization rate in ether units
-     */
+    /// @notice calculateUtilizationRateInEther calculates the utilization rate of the vault.
     function calculateUtilizationRateInEther(uint256 available, uint256 outstandingDebt) internal pure returns (uint256) {
-        // Utilization rate is 0% when there is no outstandingDebt
-        if (outstandingDebt == 0) return 0;
-
-        // Utilization rate is 100% when there is no cash available
-        if (available == 0 && outstandingDebt > 0) return 1 ether;
-
-        // utilization rate = amount outstanding debt / (amount available + amount outstanding debt)
-        uint256 rateInEther = (outstandingDebt * 1 ether) / (outstandingDebt + available);
+        if (outstandingDebt == 0) return 0; // Utilization rate is 0% when there is no outstandingDebt
+        if (available == 0 && outstandingDebt > 0) return 1 ether; // Utilization rate is 100% when there is no cash available
+        uint256 rateInEther = (outstandingDebt * 1 ether) / (outstandingDebt + available); // utilization rate = amount outstanding debt / (amount available + amount outstanding debt)
         return rateInEther;
     }
 
-    /**
-     * @notice getUtilizationRateInEther for external use
-     * @return utilizationRateInEther The utilization rate in ether units
-     */
+    /// @notice getUtilizationRateInEther for external use
     function getUtilizationRateInEther() public view returns (uint256 utilizationRateInEther) {
-        // Get total available asset
-        uint256 totalAvailable = getTotalAvailableCash();
+        uint256 totalAvailable = getTotalAvailableCash(); // Get total available asset
         utilizationRateInEther = calculateUtilizationRateInEther(totalAvailable, totalOutstandingDebt);
     }
 
-    /**
-     * @notice calculateBorrowRatePerSecondInEther calculates the borrow rate per second in ether units
-     * @param utilizationRateInEther The current utilization rate in ether units
-     * @return The borrow rate per second in ether units
-     */
+    /// @notice calculateBorrowRatePerSecondInEther calculates the borrow rate per second in ether units
     function calculateBorrowRatePerSecondInEther(uint256 utilizationRateInEther) internal view returns (uint256) {
         // utilizationRateInEther should in range [0, 1e18], Otherwise return max borrow rate
-        if (utilizationRateInEther >= 1 ether) {
-            return maxBorrowRatePerSecondInEther;
-        }
+        if (utilizationRateInEther >= 1 ether) return maxBorrowRatePerSecondInEther;
 
         // Calculate the borrow rate
         // See the formula here: https://observablehq.com/@pyk  /ethrise
@@ -184,19 +150,13 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @notice getBorrowRatePerSecondInEther returns the current borrow rate per seconds
-     * @return borrowRateInEther The borrow rate per second in ether units
-     */
+    /// @notice getBorrowRatePerSecondInEther returns the current borrow rate per seconds
     function getBorrowRatePerSecondInEther() public view returns (uint256 borrowRateInEther) {
         uint256 utilizationRateInEther = getUtilizationRateInEther();
         borrowRateInEther = calculateBorrowRatePerSecondInEther(utilizationRateInEther);
     }
 
-    /**
-     * @notice getSupplyRatePerSecondInEther calculates the supply rate per second in ether units
-     * @return supplyRateInEther The supply rate per second in ether units
-     */
+    /// @notice getSupplyRatePerSecondInEther calculates the supply rate per second in ether units
     function getSupplyRatePerSecondInEther() public view returns (uint256 supplyRateInEther) {
         uint256 utilizationRateInEther = getUtilizationRateInEther();
         uint256 borrowRateInEther = calculateBorrowRatePerSecondInEther(utilizationRateInEther);
@@ -205,81 +165,43 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         supplyRateInEther = (utilizationRateInEther * rateForSupplyInEther) / 1 ether;
     }
 
-    /**
-     * @notice getInterestAmount calculate amount of interest based on the total outstanding debt and borrow rate per second.
-     * @return The total interest amount, it have similar decimals with totalOutstandingDebt and totalVaultPendingFees.
-     */
+    /// @notice getInterestAmount calculate amount of interest based on the total outstanding debt and borrow rate per second.
     function getInterestAmount(
         uint256 outstandingDebt, // Total of outstanding debt, in underlying decimals
         uint256 borrowRatePerSecondInEther, // Borrow rates per second in ether units
         uint256 elapsedSeconds // Number of seconds elapsed since last accrued
     ) internal pure returns (uint256) {
-        // Early returns
-        if (outstandingDebt == 0 || borrowRatePerSecondInEther == 0 || elapsedSeconds == 0) {
-            return 0;
-        }
-
-        // Calculate the amount of interest
-        // interest amount = borrowRatePerSecondInEther * elapsedSeconds * outstandingDebt
-        uint256 interestAmount = (borrowRatePerSecondInEther * elapsedSeconds * outstandingDebt) / 1 ether;
+        if (outstandingDebt == 0 || borrowRatePerSecondInEther == 0 || elapsedSeconds == 0) return 0;
+        uint256 interestAmount = (borrowRatePerSecondInEther * elapsedSeconds * outstandingDebt) / 1 ether; // Calculate the amount of interest
         return interestAmount;
     }
 
-    /**
-     * @notice setVaultStates update the totalOutstandingDebt and totalPendingFees
-     * @param interestAmount The total of interest amount to be splitted, the decimals is similar to totalOutstandingDebt and totalPendingFees.
-     * @param currentTimestamp The current timestamp when the interest is accrued
-     */
+    /// @notice setVaultStates update the totalOutstandingDebt and totalPendingFees
     function setVaultStates(uint256 interestAmount, uint256 currentTimestamp) internal {
-        // Get the fee
-        uint256 feeAmount = (performanceFeeInEther * interestAmount) / 1 ether;
-
-        // Update the states
-        totalOutstandingDebt = totalOutstandingDebt + interestAmount;
+        uint256 feeAmount = (performanceFeeInEther * interestAmount) / 1 ether; // Get the fee
+        totalOutstandingDebt = totalOutstandingDebt + interestAmount; // Update the states
         totalPendingFees = totalPendingFees + feeAmount;
         lastTimestampInterestAccrued = currentTimestamp;
     }
 
-    /**
-     * @notice accrueInterest accrues interest to totalOutstandingDebt and totalPendingFees
-     * @dev This calculates interest accrued from the last checkpointed timestamp up to the current timestamp and update the totalOutstandingDebt and totalPendingFees
-     */
+    /// @notice accrueInterest accrues interest to totalOutstandingDebt and totalPendingFees
     function accrueInterest() public {
-        // Get the current timestamp, get last timestamp accrued and set the last time accrued
-        uint256 currentTimestamp = block.timestamp;
+        uint256 currentTimestamp = block.timestamp; // Get the current timestamp, get last timestamp accrued and set the last time accrued
         uint256 previousTimestamp = lastTimestampInterestAccrued;
-
-        // If currentTimestamp and previousTimestamp is similar then return early
-        if (currentTimestamp == previousTimestamp) return;
-
-        // For event logging purpose
-        uint256 previousVaultTotalOutstandingDebt = totalOutstandingDebt;
+        if (currentTimestamp == previousTimestamp) return; // If currentTimestamp and previousTimestamp is similar then return early
+        uint256 previousVaultTotalOutstandingDebt = totalOutstandingDebt; // For event logging purpose
         uint256 previousVaultTotalPendingFees = totalPendingFees;
+        uint256 borrowRatePerSecondInEther = getBorrowRatePerSecondInEther(); // Get borrow rate per second
+        uint256 elapsedSeconds = currentTimestamp - previousTimestamp; // Get time elapsed since last accrued
+        uint256 interestAmount = getInterestAmount(totalOutstandingDebt, borrowRatePerSecondInEther, elapsedSeconds); // Get the interest amount
+        setVaultStates(interestAmount, currentTimestamp); // Update the vault states based on the interest amount:
 
-        // Get borrow rate per second
-        uint256 borrowRatePerSecondInEther = getBorrowRatePerSecondInEther();
-
-        // Get time elapsed since last accrued
-        uint256 elapsedSeconds = currentTimestamp - previousTimestamp;
-
-        // Get the interest amount
-        uint256 interestAmount = getInterestAmount(totalOutstandingDebt, borrowRatePerSecondInEther, elapsedSeconds);
-
-        // Update the vault states based on the interest amount:
-        // totalOutstandingDebt & totalPendingFees
-        setVaultStates(interestAmount, currentTimestamp);
-
-        // Emit the event
         emit InterestAccrued(previousTimestamp, currentTimestamp, previousVaultTotalOutstandingDebt, previousVaultTotalPendingFees, borrowRatePerSecondInEther, elapsedSeconds, interestAmount, totalOutstandingDebt, totalPendingFees);
     }
 
-    /**
-     * @notice getExchangeRateInEther get the current exchange rate of vault token in term of Vault's underlying token.
-     * @return The exchange rates in ether units
-     */
+    /// @notice getExchangeRateInEther get the current exchange rate of vault token in term of Vault's underlying token.
     function getExchangeRateInEther() public view returns (uint256) {
         uint256 totalSupply = totalSupply();
-
         if (totalSupply == 0) {
             // If there is no supply, exchange rate is 1:1
             return 1 ether;
@@ -292,59 +214,29 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @notice Lender supplies underlying token into the vault and receives
-     *         vault tokens in exchange
-     * @param amount The amount of the underlying token to supply
-     */
+    /// @notice Lender supplies underlying token into the vault and receives vault tokens in exchange
     function addSupply(uint256 amount) external nonReentrant {
-        // Accrue interest
-        accrueInterest();
+        accrueInterest(); // Accrue interest
+        IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), amount); // Transfer asset from lender to the vault
+        uint256 exchangeRateInEther = getExchangeRateInEther(); // Get the exchange rate
+        uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther; // Calculate how much vault token we need to send to the lender
+        _mint(msg.sender, mintedAmount); // Send vault token to the lender
 
-        // Transfer asset from lender to the vault
-        IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), amount);
-
-        // Get the exchange rate
-        uint256 exchangeRateInEther = getExchangeRateInEther();
-
-        // Calculate how much vault token we need to send to the lender
-        uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther;
-
-        // Send vault token to the lender
-        _mint(msg.sender, mintedAmount);
-
-        // Emit event
         emit SupplyAdded(msg.sender, amount, exchangeRateInEther, mintedAmount);
     }
 
-    /**
-     * @notice Lender burn vault tokens and receives underlying tokens in exchange
-     * @param amount The amount of the vault tokens
-     */
+    /// @notice Lender burn vault tokens and receives underlying tokens in exchange
     function removeSupply(uint256 amount) external nonReentrant {
-        // Accrue interest
-        accrueInterest();
+        accrueInterest(); // Accrue interest
+        _burn(msg.sender, amount); // Burn the vault tokens from the lender
+        uint256 exchangeRateInEther = getExchangeRateInEther(); // Get the exchange rate
+        uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether; // Calculate how much underlying token we need to send to the lender
+        IERC20(underlyingToken).safeTransfer(msg.sender, redeemedAmount); // Transfer Vault's underlying token from the vault to the lender
 
-        // Burn the vault tokens from the lender
-        _burn(msg.sender, amount);
-
-        // Get the exchange rate
-        uint256 exchangeRateInEther = getExchangeRateInEther();
-
-        // Calculate how much underlying token we need to send to the lender
-        uint256 redeemedAmount = (exchangeRateInEther * amount) / 1 ether;
-
-        // Transfer Vault's underlying token from the vault to the lender
-        IERC20(underlyingToken).safeTransfer(msg.sender, redeemedAmount);
-
-        // Emit event
         emit SupplyRemoved(msg.sender, amount, exchangeRateInEther, redeemedAmount);
     }
 
-    /**
-     * @notice getDebtProportionRateInEther returns the proportion of borrow amount relative to the totalOutstandingDebt
-     * @return debtProportionRateInEther The debt proportion rate in ether units
-     */
+    /// @notice getDebtProportionRateInEther returns the proportion of borrow amount relative to the totalOutstandingDebt
     function getDebtProportionRateInEther() internal view returns (uint256 debtProportionRateInEther) {
         if (totalOutstandingDebt == 0 || totalDebtProportion == 0) {
             return 1 ether;
@@ -352,31 +244,20 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         debtProportionRateInEther = (totalOutstandingDebt * 1 ether) / totalDebtProportion;
     }
 
-    /**
-     * @notice getOutstandingDebt returns the debt owed by the RISE/DROP tokens
-     * @param token The RISE/DROP token address
-     */
+    /// @notice getOutstandingDebt returns the debt owed by the RISE/DROP tokens
     function getOutstandingDebt(address token) public view returns (uint256) {
         // If there is no debt, return 0
-        if (totalOutstandingDebt == 0) {
-            return 0;
-        }
-
+        if (totalOutstandingDebt == 0) return 0;
         // Calculate the outstanding debt
         // outstanding debt = debtProportion * debtProportionRate
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
         uint256 a = (debtProportion[token] * debtProportionRateInEther);
         uint256 b = 1 ether;
         uint256 outstandingDebt = a / b + (a % b == 0 ? 0 : 1); // Rounds up instead of rounding down
-
         return outstandingDebt;
     }
 
-    /**
-     * @notice setBorrowStates sets the debt of the RISE/DROP token
-     * @param token The address of the RISE token
-     * @param borrowAmount The amount that borrowed by the RISE/DROP token
-     */
+    /// @notice setBorrowStates sets the debt of the RISE/DROP token
     function setBorrowStates(address token, uint256 borrowAmount) internal {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
         totalOutstandingDebt += borrowAmount;
@@ -385,16 +266,25 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         debtProportion[token] = debtProportion[token] + borrowProportion;
     }
 
-    /**
-     * @notice setRepayStates repay the debt of the RISE tokens
-     * @param token The address of the RISE token
-     * @param repayAmount The amount that borrowed by the ETF
-     */
+    /// @notice setRepayStates repay the debt of the RISE tokens
     function setRepayStates(address token, uint256 repayAmount) internal {
         uint256 debtProportionRateInEther = getDebtProportionRateInEther();
-        totalOutstandingDebt -= repayAmount;
+        // Handle repay amount larger than existing total debt
+        if (repayAmount > totalOutstandingDebt) {
+            totalOutstandingDebt = 0;
+        } else {
+            totalOutstandingDebt -= repayAmount;
+        }
         uint256 repayProportion = (repayAmount * 1 ether) / debtProportionRateInEther;
-        totalDebtProportion -= repayProportion;
-        debtProportion[token] -= repayProportion;
+        if (repayProportion > totalDebtProportion) {
+            totalDebtProportion = 0;
+        } else {
+            totalDebtProportion -= repayProportion;
+        }
+        if (repayProportion > debtProportion[token]) {
+            debtProportion[token] -= 0;
+        } else {
+            debtProportion[token] -= repayProportion;
+        }
     }
 }
