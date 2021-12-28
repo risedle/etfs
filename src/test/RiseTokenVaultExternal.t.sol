@@ -789,6 +789,34 @@ contract RiseTokenVaultExternalTest is DSTest {
         assertEq(vault.getOutstandingDebt(address(unirise)), 128646224);
     }
 
+    function testFail_ERC20RISELeverageDownFailedWhenHighSlippage() public {
+        // Create new price oracles for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
+
+        // Create new swap contracts, with artificial slippage 10%
+        CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.1 ether);
+        hevm.setUNIBalance(address(swapContract), 1_000_000 ether); // 1_000_000 UNI token
+        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC token
+
+        // Create new vaults for UNIRISE
+        uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
+        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapContract, false, UNI_ADDRESS, initialPrice);
+
+        // Create the dummy users
+        DummyUser user = new DummyUser(vault);
+        hevm.setUNIBalance(address(user), 10 ether);
+
+        // Mint UNIRISE
+        user.mintWithERC20(address(unirise), 10 ether); // Mint UNIRISE with 10 UNI
+
+        // Set UNI price to go down, then leverage ratio will go up
+        oracle.setPrice(11.2 * 1e6);
+
+        // Execute the rebalance; This should be failed
+        vault.rebalance(address(unirise));
+    }
+
     // Test Redeem
     // mint, no price change, then redeem, User should receive their collateral back minus 0.2% fee
     // mint, price go up, then redeem, User should receive their collateral back plus their profit
