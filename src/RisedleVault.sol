@@ -319,7 +319,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
         emit FeeRecipientUpdated(msg.sender, account);
     }
 
-    /// @notice collectPendingFees withdraws collected fees to the FEE_RECIPIENT address
+    /// @notice collectVaultPendingFees withdraws collected fees to the FEE_RECIPIENT address
     function collectVaultPendingFees() external {
         accrueInterest(); // Accrue interest
         uint256 collectedFees = totalPendingFees;

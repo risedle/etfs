@@ -388,6 +388,18 @@ contract RiseTokenVault is RisedleVault {
         emit RiseTokenBurned(msg.sender, token, redeemAmount);
     }
 
+    /// @notice collectPendingFees withdraws collected fees to the FEE_RECIPIENT address
+    function collectPendingFees(address token) external {
+        accrueInterest(); // Accrue interest
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
+        IERC20(riseTokenMetadata.collateral).safeTransfer(FEE_RECIPIENT, riseTokenMetadata.totalPendingFees);
+        riseTokens[token].totalCollateralPlusFee -= riseTokenMetadata.totalPendingFees;
+        riseTokens[token].totalPendingFees = 0;
+
+        emit FeeCollected(msg.sender, collectedFees, FEE_RECIPIENT);
+    }
+
     /// @notice Receive ETH
     receive() external payable {}
 }
