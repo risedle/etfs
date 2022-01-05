@@ -36,6 +36,10 @@ contract UniswapV3SwapTest is DSTest {
         // Use Uniswap V3 WETH/USDC 0.05% fee liquidity
         UniswapV3Swap uniswap = new UniswapV3Swap(UNISWAPV3_SWAP_ROUTER, 500);
 
+        // Make sure the public variable is correct
+        assertEq(uniswap.router(), UNISWAPV3_SWAP_ROUTER);
+        assertEq(uniswap.poolFee(), 500);
+
         // Use Chainlink oracle
         ChainlinkOracle oracle = new ChainlinkOracle("Chainlink ETH/USDC", CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
 

@@ -17,30 +17,20 @@ import { ISwapRouter } from "../interfaces/UniswapV3.sol";
 contract UniswapV3Swap {
     using SafeERC20 for IERC20;
 
-    /// @notice The Uniswap V3 router address
-    address private router;
-
-    /// @notice The Uniswap V3 pool's fee (500, 3000, 10000)
-    uint24 private poolFee;
+    address public router; // The Uniswap V3 router address
+    uint24 public poolFee; // The Uniswap V3 pool's fee (500, 3000, 10000)
 
     constructor(address uniswapRouter, uint24 fee) {
         router = uniswapRouter;
         poolFee = fee;
     }
 
-    /**
-     * @notice Swap tokenIn to tokenOut
-     * @param tokenIn The ERC20 address of token that we want to swap
-     * @param tokenOut The ERC20 address of token that we want swap to
-     * @param maxAmountIn The maximum amount of tokenIn to get the tokenOut with amountOut
-     * @param amountOut The amount of tokenOut that we want to get
-     * @return amountIn The amount of tokenIn that we spend to get the amountOut of tokenOut
-     */
+    /// @notice Swap tokenIn to tokenOut; It returns the amount of tokenIn that we spend to get the amountOut of tokenOut
     function swap(
-        address tokenIn,
-        address tokenOut,
-        uint256 maxAmountIn,
-        uint256 amountOut
+        address tokenIn, // The ERC20 address of token that we want to swap
+        address tokenOut, // The ERC20 address of token that we want swap to
+        uint256 maxAmountIn, // The maximum amount of tokenIn to get the tokenOut with amountOut
+        uint256 amountOut // The amount of tokenOut that we want to get
     ) external returns (uint256 amountIn) {
         // Transfer the specified amount of tokenIn to this contract.
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), maxAmountIn);
