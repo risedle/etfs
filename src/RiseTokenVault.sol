@@ -401,6 +401,13 @@ contract RiseTokenVault is RisedleVault {
         riseTokens[token].maxTotalCollateral = maxTotalCollateral;
     }
 
+    /// @notice Set the oracle contract
+    function setOracleContract(address token, address newOracle) external onlyOwner {
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
+        riseTokens[token].oracleContract = newOracle;
+    }
+
     /// @notice Receive ETH
     receive() external payable {}
 }
