@@ -12,10 +12,21 @@ import { ChainlinkOracle } from "../../oracles/ChainlinkOracle.sol";
 import { CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, CHAINLINK_BTC_USD, CHAINLINK_USDT_USD } from "chain/Constants.sol";
 
 contract ChainlinkOracleTest is DSTest {
+    /// @notice Make sure the public variable is correctly set
+    function test_ChainlinkPublicVariable() public {
+        // Create new chainlink oracle
+        ChainlinkOracle oracle = new ChainlinkOracle("Chainlink ETH/USDC", CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
+
+        assertEq(oracle.name(), "Chainlink ETH/USDC");
+        assertEq(oracle.baseFeed(), CHAINLINK_ETH_USD);
+        assertEq(oracle.quoteFeed(), CHAINLINK_USDC_USD);
+        assertEq(oracle.quoteDecimals(), 6);
+    }
+
     /// @notice Make sure ETH/USDC is working as expected
     function test_ChainlinkETHUSDC() public {
         // Create new chainlink oracle
-        ChainlinkOracle oracle = new ChainlinkOracle(CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
+        ChainlinkOracle oracle = new ChainlinkOracle("Chainlink ETH/USDC", CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
 
         // Get price
         uint256 price = IRisedleOracle(address(oracle)).getPrice();
@@ -30,7 +41,7 @@ contract ChainlinkOracleTest is DSTest {
     /// @notice Make sure BTC/USDT is working as expected
     function test_ChainlinkBTCUSDT() public {
         // Create new chainlink oracle
-        ChainlinkOracle oracle = new ChainlinkOracle(CHAINLINK_BTC_USD, CHAINLINK_USDT_USD, 6);
+        ChainlinkOracle oracle = new ChainlinkOracle("Chainlink ETH/USDC", CHAINLINK_BTC_USD, CHAINLINK_USDT_USD, 6);
 
         // Get price
         uint256 price = IRisedleOracle(address(oracle)).getPrice();
