@@ -37,7 +37,7 @@ contract UniswapV3SwapTest is DSTest {
         UniswapV3Swap uniswap = new UniswapV3Swap(UNISWAPV3_SWAP_ROUTER, 500);
 
         // Use Chainlink oracle
-        ChainlinkOracle oracle = new ChainlinkOracle(CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
+        ChainlinkOracle oracle = new ChainlinkOracle("Chainlink ETH/USDC", CHAINLINK_ETH_USD, CHAINLINK_USDC_USD, 6);
 
         // Execute the borrow and swap
         uint256 collateralAmount = 1 ether;
