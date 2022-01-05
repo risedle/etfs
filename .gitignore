@@ -7,3 +7,5 @@ hevm.libs*
 .dapprc
 
 scripts/deploy-*
+
+kovan-*.sh
