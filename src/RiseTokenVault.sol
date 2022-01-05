@@ -41,14 +41,13 @@ contract RiseTokenVault is RisedleVault {
     /// @notice Mapping TOKENRISE to their metadata
     mapping(address => RiseTokenMetadata) riseTokens;
 
-    /// @notice Event emitted when new TOKENRISE is created
-    event RiseTokenCreated(address indexed creator, address token);
-    /// @notice Event emitted when TOKENRISE is minted
-    event RiseTokenMinted(address indexed user, address indexed riseToken, uint256 mintedAmount);
-    /// @notice Event emitted when TOKENRISE is successfully rebalanced
-    event RiseTokenRebalanced(address indexed executor, uint256 previousLeverageRatioInEther);
-    /// @notice Event emitted when TOKENRISE is burned
-    event RiseTokenBurned(address indexed user, address indexed riseToken, uint256 redeemedAmount);
+    event RiseTokenCreated(address indexed creator, address token); // Event emitted when new TOKENRISE is created
+    event RiseTokenMinted(address indexed user, address indexed riseToken, uint256 mintedAmount); // Event emitted when TOKENRISE is minted
+    event RiseTokenRebalanced(address indexed executor, uint256 previousLeverageRatioInEther); // Event emitted when TOKENRISE is successfully rebalanced
+    event RiseTokenBurned(address indexed user, address indexed riseToken, uint256 redeemedAmount); // Event emitted when TOKENRISE is burned
+    event MaxTotalCollateralUpdated(address indexed token, uint256 newMaxTotalCollateral); // Event emitted when max collateral is set
+    event OracleContractUpdated(address indexed token, address indexed oracle); // Event emitted when new oracle contract is set
+    event SwapContractUpdated(address indexed token, address indexed swap); // Event emitted when new swap contract is set
 
     /// @notice Construct new RiseTokenVault
     constructor(
@@ -399,6 +398,7 @@ contract RiseTokenVault is RisedleVault {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
         riseTokens[token].maxTotalCollateral = maxTotalCollateral;
+        emit MaxTotalCollateralUpdated(token, maxTotalCollateral);
     }
 
     /// @notice Set the oracle contract
@@ -406,6 +406,15 @@ contract RiseTokenVault is RisedleVault {
         RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
         require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
         riseTokens[token].oracleContract = newOracle;
+        emit OracleContractUpdated(token, newOracle);
+    }
+
+    /// @notice Set the swap contract
+    function setSwapContract(address token, address newSwap) external onlyOwner {
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[token];
+        require(riseTokenMetadata.feeInEther > 0, "!RTNE"); // Make sure the TOKENRISE is exists
+        riseTokens[token].swapContract = newSwap;
+        emit SwapContractUpdated(token, newSwap);
     }
 
     /// @notice Receive ETH
