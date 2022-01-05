@@ -14,21 +14,24 @@ import { IChainlinkAggregatorV3 } from "../interfaces/Chainlink.sol";
 contract ChainlinkOracle {
     // Chainlink feed contract addresses
     // See here: https://docs.chain.link/docs/reference-contracts/
-    address private baseFeed;
-    address private quoteFeed;
-    uint8 private quoteDecimals;
+    string public name;
+    address public baseFeed;
+    address public quoteFeed;
+    uint8 public quoteDecimals;
 
     /**
      * @notice Contruct new Chainlink oracle
      */
     constructor(
-        address base, // The contract address of base asset price feed in term of USD (e.g ETH/USD)
-        address quote, // The contract address of quote asset price feed in term of USD (e.g. USDC/USD)
-        uint8 decimals // The decimals number of quote asset (e.g. USDC is 6 decimals token)
+        string memory _name, // The oracle identifier (e.g. ETH/USDC)
+        address _baseFeed, // The contract address of base asset price feed in term of USD (e.g ETH/USD)
+        address _quoteFeed, // The contract address of quote asset price feed in term of USD (e.g. USDC/USD)
+        uint8 _quoteDecimals // The decimals number of quote asset (e.g. USDC is 6 decimals token)
     ) {
-        baseFeed = base;
-        quoteFeed = quote;
-        quoteDecimals = decimals;
+        name = _name;
+        baseFeed = _baseFeed;
+        quoteFeed = _quoteFeed;
+        quoteDecimals = _quoteDecimals;
     }
 
     /**
