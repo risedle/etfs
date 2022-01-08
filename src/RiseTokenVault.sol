@@ -72,8 +72,11 @@ contract RiseTokenVault is RisedleVault {
         uint256 maxRebalancingValue, // The maximum value of buy/sell when rebalancing (e.g. 500K USDC is 500000 * 1e6)
         uint256 rebalancingStepInEther // The rebalancing step in ether units (e.g. 0.2 is 0.2 ether or 0.2 * 1e18)
     ) external onlyOwner {
+        RiseTokenMetadata memory riseTokenMetadata = riseTokens[tokenRiseAddress];
+        require(riseTokenMetadata.feeInEther == 0, "!AE"); // Make sure token metadata is not exists
+
         // Create new Rise metadata
-        RiseTokenMetadata memory riseTokenMetadata = RiseTokenMetadata({
+        riseTokens[tokenRiseAddress] = RiseTokenMetadata({
             isETH: isETH,
             token: tokenRiseAddress,
             collateral: collateral,
@@ -90,9 +93,6 @@ contract RiseTokenVault is RisedleVault {
             totalPendingFees: 0,
             maxTotalCollateral: 0
         });
-
-        // Map new info to their token
-        riseTokens[tokenRiseAddress] = riseTokenMetadata;
 
         // Emit event
         emit RiseTokenCreated(msg.sender, tokenRiseAddress);
