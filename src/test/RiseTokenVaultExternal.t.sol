@@ -1082,4 +1082,64 @@ contract RiseTokenVaultExternalTest is DSTest {
         user.mintWithERC20(address(unirise), 200 ether);
         user.mintWithERC20(address(unirise), 400 ether); // This should be failed
     }
+
+    /// @notice Make sure Owner cannot create same TOKENRISE twice
+    function testFail_OwnerCannotCreateLeveragedTokenTwice() public {
+        // Create new price oracle for the collateral
+        CustomizableOracle oracle = new CustomizableOracle();
+        oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
+
+        // Create new swap contract, with artificial slippage 0.5%
+        CustomizableSwap swap = new CustomizableSwap(address(oracle), 0.005 ether);
+        // Fund the swap contract with ERC20
+        hevm.setUNIBalance(address(swap), 1_000_000 ether); // 1M UNI token
+
+        // Create new vault
+        uint256 initialPrice = 10 * 1e6;
+
+        // Update the contract balance to 100K USDC; We use this to supply the vault
+        uint256 vaultSupplyAmount = 100_000 * 1e6; // 100K USDC
+        hevm.setUSDCBalance(address(this), vaultSupplyAmount);
+
+        // Create new vault first; by default the deployer is the owner
+        RiseTokenVault vault = new RiseTokenVault("Risedle USDC Vault", "rvUSDC", USDC_ADDRESS, address(this));
+
+        // Add supply to the vault
+        IERC20(USDC_ADDRESS).safeApprove(address(vault), vaultSupplyAmount);
+        vault.addSupply(vaultSupplyAmount);
+
+        // Create new UNIRISE
+        uint256 feeInEther = 0.001 ether; // 0.1%
+        RisedleERC20 token = new RisedleERC20("UNI 2x Long Risedle", "UNIRISE", address(vault), IERC20Metadata(UNI_ADDRESS).decimals());
+        vault.create(
+            false,
+            address(token),
+            UNI_ADDRESS,
+            address(oracle),
+            address(swap),
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            initialPrice, // Initial price
+            feeInEther, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            3 ether, // Max leverage ratio is 3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.3 ether // Rebalancing step is 0.3x
+        );
+
+        // This should be reverted
+        vault.create(
+            false,
+            address(token),
+            UNI_ADDRESS,
+            address(oracle),
+            address(swap),
+            0.05 ether, // Max 5% slippage for mint, redeem and rebalance
+            initialPrice, // Initial price
+            feeInEther, // creation and redemption fees is 0.1%
+            1.7 ether, // Min leverage ratio is 1.7x
+            3 ether, // Max leverage ratio is 3x
+            250000 * 1e6, // Max value of sell/buy is 250K USDC
+            0.3 ether // Rebalancing step is 0.3x
+        );
+    }
 }
