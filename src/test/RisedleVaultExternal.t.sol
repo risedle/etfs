@@ -181,4 +181,37 @@ contract RisedleVaultExternalTest is DSTest {
         // Supply again this should be failed
         lender.lend(amount);
     }
+
+    /// @notice Make sure subsequent redeem is working correctly
+    function test_SubsequentRemoveSupply() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDC balance
+        uint256 amount = 1_000_000 * 1e6; // 1M USDC
+        hevm.setUSDCBalance(address(lender), amount);
+
+        // Lender add supply to the vault
+        lender.lend(amount);
+
+        // Set timestamp to next 5 days
+        hevm.warp(block.timestamp + (60 * 24 * 5));
+
+        // Lender remove supply from the vault
+        lender.withdraw(0.5 * 1e6);
+
+        // The vault's token should be burned
+        assertEq(IERC20(address(vault)).totalSupply(), amount - (0.5 * 1e6));
+        assertEq(IERC20(address(vault)).balanceOf(address(lender)), amount - (0.5 * 1e6));
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(lender)), 0.5 * 1e6);
+
+        // Withdraw once again
+        lender.withdraw(400_000 * 1e6);
+        assertEq(IERC20(address(vault)).totalSupply(), amount - ((0.5 * 1e6) + (400_000 * 1e6)));
+        assertEq(IERC20(address(vault)).balanceOf(address(lender)), amount - ((0.5 * 1e6) + (400_000 * 1e6)));
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(lender)), ((0.5 * 1e6) + (400_000 * 1e6)));
+    }
 }
