@@ -208,7 +208,7 @@ contract RisedleVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice Lender supplies underlying token into the vault and receives vault tokens in exchange
     function addSupply(uint256 amount) external nonReentrant {
         accrueInterest(); // Accrue interest
-        if (maxTotalDeposit != 0) require(IERC20(underlyingToken).balanceOf(address(this)) + amount < maxTotalDeposit, "!MCR"); // Max cap reached
+        if (maxTotalDeposit != 0) require(getTotalAvailableCash() + totalOutstandingDebt + amount < maxTotalDeposit, "!MCR"); // Max cap reached
         uint256 exchangeRateInEther = getExchangeRateInEther(); // Get the exchange rate
         uint256 mintedAmount = (amount * 1 ether) / exchangeRateInEther; // Calculate how much vault token we need to send to the lender
         IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), amount); // Transfer asset from lender to the vault
