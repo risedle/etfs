@@ -117,6 +117,36 @@ contract RisedleVaultExternalTest is DSTest {
         assertEq(vault.getExchangeRateInEther(), 1 ether);
     }
 
+    /// @notice Make sure subsquent supply yield the same amount of rvToken
+    function test_SubsequentSupplyToTheVault() public {
+        // Create new vault
+        RisedleVault vault = createNewVault();
+
+        // Create new lender
+        Lender lender = new Lender(vault);
+
+        // Set the lender USDC balance
+        uint256 amount = 1000 * 1e6; // 1000 USDC
+        hevm.setUSDCBalance(address(lender), amount);
+
+        // Lender add supply to the vault
+        uint256 depositAmount = 500 * 1e6;
+        lender.lend(depositAmount); // 500 USDC first
+
+        // Lender should receive the same amount of vault token
+        // Because the initial exchange rate is 1:1
+        uint256 lenderVaultTokenBalance = vault.balanceOf(address(lender));
+        assertEq(lenderVaultTokenBalance, depositAmount);
+
+        // The vault should receive the USDC
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(vault)), depositAmount);
+
+        // Lender add supply once again
+        lender.lend(depositAmount); // 500 USDC second
+        assertEq(vault.balanceOf(address(lender)), depositAmount * 2);
+        assertEq(IERC20(USDC_ADDRESS).balanceOf(address(vault)), depositAmount * 2);
+    }
+
     /// @notice Make sure anyone can remove asset from the vault
     function test_AnyoneCanRemoveSupplyFromTheVault() public {
         // Create new vault
