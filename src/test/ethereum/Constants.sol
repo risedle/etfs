@@ -24,6 +24,8 @@ address constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 uint256 constant WETH_SLOT = 3;
 address constant UNI_ADDRESS = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
 uint256 constant UNI_SLOT = 51;
+address constant GOHM_ADDRESS = 0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
+uint256 constant GOHM_SLOT = 0;
 
 // Chainlink feeds
 address constant CHAINLINK_ETH_USD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
