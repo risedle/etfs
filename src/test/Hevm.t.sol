@@ -63,7 +63,7 @@ contract HevmTest is DSTest {
     function test_setUNIBalance() public {
         IERC20 token = IERC20(UNI_ADDRESS);
         address account = hevm.addr(1);
-        uint256 amount = 100 * 1e6; // 100 UNI
+        uint256 amount = 100 ether; // 100 UNI
 
         // Set the balance
         hevm.setUNIBalance(account, amount);
@@ -73,5 +73,20 @@ contract HevmTest is DSTest {
 
         // Make sure it's updated
         assertEq(amount, balance);
+    }
+
+    function test_setGOHMBalance() public {
+        IERC20 token = IERC20(GOHM_ADDRESS);
+        address account = hevm.addr(1);
+        uint256 amount = 100 ether; // 100 gOHM
+
+        // Set the balance
+        hevm.setGOHMBalance(account, amount);
+
+        // Check the balance
+        uint256 balance = token.balanceOf(account);
+
+        // Make sure it's updated
+        assertEq(balance, amount);
     }
 }
