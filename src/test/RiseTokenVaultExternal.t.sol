@@ -824,26 +824,26 @@ contract RiseTokenVaultExternalTest is DSTest {
     function testFail_ETHRISERebalanceInRangeShouldBeReverted() public {
         // Create new price oracles for the collateral
         CustomizableOracle oracle = new CustomizableOracle();
-        oracle.setPrice(15 * 1e6); // Set UNI price to 15 USDC
+        oracle.setPrice(4_000 * 1e6); // Set ETH price to 4K USDC
 
         // Create new swap contracts, with artificial slippage 0.05%
         CustomizableSwap swapContract = new CustomizableSwap(address(oracle), 0.005 ether);
-        hevm.setUNIBalance(address(swapContract), 1_000_000 ether); // 1_000_000 UNI token
-        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC token
+        hevm.setUSDCBalance(address(swapContract), 1_000_000 * 1e6); // 1_000_000 USDC
+        hevm.setWETHBalance(address(swapContract), 1_000_000 ether); // 1_000_000 WETH
 
-        // Create new vaults for UNIRISE
-        uint256 initialPrice = 10 * 1e6; // Initial price is 10 USDC
-        (RiseTokenVault vault, RisedleERC20 unirise) = createNewVault(oracle, swapContract, false, UNI_ADDRESS, initialPrice);
+         // Create new vaults for ETHRISE
+        uint256 initialPrice = 100 * 1e6; // Initial price is 100 USDC
+        (RiseTokenVault vault, RisedleERC20 ethrise) = createNewVault(oracle, swapContract, true, WETH_ADDRESS, initialPrice);
 
         // Create the dummy users
         DummyUser user = new DummyUser(vault);
-        hevm.setUNIBalance(address(user), 10 ether);
+        sendETH(payable(address(user)), 1 ether);
 
-        // Mint UNIRISE
-        user.mintWithERC20(address(unirise), 10 ether); // Mint UNIRISE with 10 UNI
+        // Mint ETHRISE
+        user.mintWithETH(address(ethrise), 1 ether);
 
         // Execute the rebalance; This should be failed
-        vault.rebalance(address(unirise));
+        vault.rebalance(address(ethrise));
     }
 
     function testFail_ERC20RISERebalanceInRangeShouldBeReverted() public {
